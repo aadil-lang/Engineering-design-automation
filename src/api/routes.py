@@ -4,6 +4,7 @@ from vision.processor import load_and_validate_image
 from vision.detector import extract_features
 from geometry.extractor import extract_engineering_features
 from annotations.extractor import extract_annotations
+from semantics.extractor import extract_mechanical_semantics
 from reasoning.models import (
     ReasoningRequest,
     ReasoningResponse,
@@ -15,7 +16,7 @@ router = APIRouter()
 
 
 async def _run_analysis_pipeline(file: UploadFile) -> AnalyzeResponse:
-    """Internal helper running the complete Slice 1-3 computer vision and annotation pipeline."""
+    """Internal helper running the complete Slice 1-3 and Slice 6 computer vision, annotation, and semantic pipeline."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
@@ -46,6 +47,13 @@ async def _run_analysis_pipeline(file: UploadFile) -> AnalyzeResponse:
     )
     cv_response.annotations = annotations
 
+    # 5. Extract Mechanical Engineering Semantics (Slice 6)
+    mechanical_semantics = extract_mechanical_semantics(
+        engineering_features=engineering_features,
+        annotations=annotations
+    )
+    cv_response.mechanical_semantics = mechanical_semantics
+
     return cv_response
 
 
@@ -53,7 +61,7 @@ async def _run_analysis_pipeline(file: UploadFile) -> AnalyzeResponse:
 async def analyze_drawing(file: UploadFile = File(...)):
     """
     Analyzes an uploaded engineering drawing image and returns structured CV primitives,
-    engineering features, relationships, and annotations.
+    engineering features, relationships, annotations, and mechanical engineering semantics.
     """
     return await _run_analysis_pipeline(file)
 

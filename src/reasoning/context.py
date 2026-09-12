@@ -19,6 +19,7 @@ class DrawingContext(BaseModel):
     symbols: List[Dict[str, Any]] = Field(default_factory=list)
     associations: List[Dict[str, Any]] = Field(default_factory=list)
     ocr_results: List[Dict[str, Any]] = Field(default_factory=list)
+    mechanical_features: List[Dict[str, Any]] = Field(default_factory=list)
     summary: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -134,6 +135,15 @@ def build_drawing_context(analysis: AnalyzeResponse) -> DrawingContext:
         if ann.summary:
             summary.update(ann.summary)
 
+    # Slice 6: Mechanical Semantics Evidence
+    mech_feats: List[Dict[str, Any]] = []
+    if getattr(analysis, "mechanical_semantics", None):
+        ms = analysis.mechanical_semantics
+        if ms and ms.features:
+            mech_feats = [f.model_dump() for f in ms.features]
+        if ms and ms.summary:
+            summary.update({"mechanical_summary": ms.summary})
+
     return DrawingContext(
         image=image_meta,
         line_features=line_feats,
@@ -144,6 +154,7 @@ def build_drawing_context(analysis: AnalyzeResponse) -> DrawingContext:
         symbols=syms,
         associations=assocs,
         ocr_results=ocr_items,
+        mechanical_features=mech_feats,
         summary=summary
     )
 
@@ -163,7 +174,7 @@ def select_context_for_question(
     }
 
     if question_type == QuestionType.HOLE_ANALYSIS:
-        # Prioritize circles, hole candidates, diameter/radius dimensions, and circle associations
+        # Prioritize circles, hole candidates, diameter/radius dimensions, circle associations, and hole semantics
         diameter_radius_dims = [
             d for d in context.dimensions if d.get("type") in ("diameter", "radius")
         ]
@@ -171,7 +182,7 @@ def select_context_for_question(
         circle_assocs = [
             a for a in context.associations if a.get("feature_id") in circle_ids
         ]
-        return {
+        result = {
             **base_info,
             "circle_features": context.circle_features,
             "dimensions": diameter_radius_dims or context.dimensions,
@@ -181,10 +192,16 @@ def select_context_for_question(
                 "hole_candidates": sum(1 for c in context.circle_features if c.get("likely_hole"))
             }
         }
+        if context.mechanical_features:
+            result["mechanical_features"] = [
+                mf for mf in context.mechanical_features
+                if mf.get("feature_type") in ("hole", "hole_pattern", "circular_feature")
+            ]
+        return result
 
     if question_type == QuestionType.DIMENSION_SUMMARY:
         # Prioritize dimensions, tolerances, units, symbols, and associations
-        return {
+        result = {
             **base_info,
             "dimensions": context.dimensions,
             "symbols": context.symbols,
@@ -194,10 +211,11 @@ def select_context_for_question(
                 "total_symbols": len(context.symbols)
             }
         }
+        return result
 
     if question_type == QuestionType.RELATIONSHIP_ANALYSIS:
-        # Prioritize lines, orientations, and geometric relationships
-        return {
+        # Prioritize lines, orientations, geometric relationships, and relational mechanical features
+        result = {
             **base_info,
             "line_features": context.line_features,
             "relationships": context.relationships,
@@ -206,10 +224,16 @@ def select_context_for_question(
                 "total_relationships": len(context.relationships)
             }
         }
+        if context.mechanical_features:
+            result["mechanical_features"] = [
+                mf for mf in context.mechanical_features
+                if mf.get("feature_type") in ("parallel_feature", "perpendicular_feature", "symmetric_feature")
+            ]
+        return result
 
     if question_type == QuestionType.GEOMETRY_SUMMARY:
-        # Prioritize lines, circles, bounding box
-        return {
+        # Prioritize lines, circles, bounding box, and macroscopic mechanical features
+        result = {
             **base_info,
             "line_features": context.line_features,
             "circle_features": context.circle_features,
@@ -219,6 +243,12 @@ def select_context_for_question(
                 "total_circles": len(context.circle_features)
             }
         }
+        if context.mechanical_features:
+            result["mechanical_features"] = [
+                mf for mf in context.mechanical_features
+                if mf.get("feature_type") in ("rectangular_plate", "slot", "shaft", "stepped_feature", "symmetric_feature", "circular_feature", "hole")
+            ]
+        return result
 
     if question_type == QuestionType.ANNOTATION_SUMMARY:
         # Prioritize OCR results, symbols, and dimensions
@@ -234,7 +264,7 @@ def select_context_for_question(
         }
 
     # General Engineering Question: include full context in compact form
-    return {
+    result = {
         **base_info,
         "line_features": context.line_features,
         "circle_features": context.circle_features,
@@ -244,6 +274,9 @@ def select_context_for_question(
         "associations": context.associations,
         "summary": context.summary
     }
+    if context.mechanical_features:
+        result["mechanical_features"] = context.mechanical_features
+    return result
 
 
 def drawing_context_to_json(
