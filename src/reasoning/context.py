@@ -21,6 +21,7 @@ class DrawingContext(BaseModel):
     ocr_results: List[Dict[str, Any]] = Field(default_factory=list)
     mechanical_features: List[Dict[str, Any]] = Field(default_factory=list)
     engineering_knowledge: Optional[Dict[str, Any]] = None
+    analysis_plan: Optional[Dict[str, Any]] = None
     summary: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -154,6 +155,17 @@ def build_drawing_context(analysis: AnalyzeResponse) -> DrawingContext:
             if ek.applicable_rules:
                 summary.update({"applicable_engineering_rules_count": len(ek.applicable_rules)})
 
+    # Slice 8: Analysis Plan Evidence
+    plan_dict: Optional[Dict[str, Any]] = None
+    if getattr(analysis, "analysis_plan", None):
+        ap = analysis.analysis_plan
+        if ap:
+            plan_dict = ap.model_dump()
+            summary.update({
+                "planned_analyses_count": len(ap.items),
+                "ready_analyses_count": len(ap.ready_analyses)
+            })
+
     return DrawingContext(
         image=image_meta,
         line_features=line_feats,
@@ -166,6 +178,7 @@ def build_drawing_context(analysis: AnalyzeResponse) -> DrawingContext:
         ocr_results=ocr_items,
         mechanical_features=mech_feats,
         engineering_knowledge=eng_knowledge,
+        analysis_plan=plan_dict,
         summary=summary
     )
 
@@ -226,6 +239,16 @@ def select_context_for_question(
                     if not m.get("rule_id") or any(k in m.get("rule_id", "") for k in ("hole", "pattern", "material"))
                 ]
             }
+        if context.analysis_plan:
+            ap = context.analysis_plan
+            filtered_items = [
+                it for it in ap.get("items", [])
+                if it.get("analysis_type") in ("hole_pattern_load", "bearing_stress")
+            ]
+            result["analysis_plan"] = {
+                "items": filtered_items,
+                "ready_analyses": [t for t in ap.get("ready_analyses", []) if t in ("hole_pattern_load", "bearing_stress")]
+            }
         return result
 
     if question_type == QuestionType.DIMENSION_SUMMARY:
@@ -263,7 +286,7 @@ def select_context_for_question(
         return result
 
     if question_type == QuestionType.GEOMETRY_SUMMARY:
-        # Prioritize lines, circles, bounding box, and macroscopic mechanical features
+        # Prioritize lines, circles, bounding box, macroscopic mechanical features, and analysis plan overview
         result = {
             **base_info,
             "line_features": context.line_features,
@@ -281,6 +304,8 @@ def select_context_for_question(
             ]
         if context.engineering_knowledge:
             result["engineering_knowledge"] = context.engineering_knowledge
+        if context.analysis_plan:
+            result["analysis_plan"] = context.analysis_plan
         return result
 
     if question_type == QuestionType.ANNOTATION_SUMMARY:
@@ -311,6 +336,8 @@ def select_context_for_question(
         result["mechanical_features"] = context.mechanical_features
     if context.engineering_knowledge:
         result["engineering_knowledge"] = context.engineering_knowledge
+    if context.analysis_plan:
+        result["analysis_plan"] = context.analysis_plan
     return result
 
 
