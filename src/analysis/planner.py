@@ -123,6 +123,22 @@ class AnalysisPlanner:
                         p_feat = self._find_candidate_feature(AnalysisType.BOLT_PRELOAD, features)
                         items.append(self._build_plan_item(AnalysisType.BOLT_PRELOAD, None, p_feat, inputs, req, from_rule=False))
                         processed_types.add(AnalysisType.BOLT_PRELOAD)
+            elif elem_spec in ("shaft", "axle", "rotor", "spindle"):
+                if "torque" in inputs and "bending_moment" in inputs:
+                    if AnalysisType.COMBINED_STRESS not in processed_types:
+                        p_feat = self._find_candidate_feature(AnalysisType.COMBINED_STRESS, features)
+                        items.append(self._build_plan_item(AnalysisType.COMBINED_STRESS, None, p_feat, inputs, req, from_rule=False))
+                        processed_types.add(AnalysisType.COMBINED_STRESS)
+                elif "torque" in inputs:
+                    if AnalysisType.TORSION not in processed_types:
+                        p_feat = self._find_candidate_feature(AnalysisType.TORSION, features)
+                        items.append(self._build_plan_item(AnalysisType.TORSION, None, p_feat, inputs, req, from_rule=False))
+                        processed_types.add(AnalysisType.TORSION)
+                elif "bending_moment" in inputs:
+                    if AnalysisType.BENDING not in processed_types:
+                        p_feat = self._find_candidate_feature(AnalysisType.BENDING, features)
+                        items.append(self._build_plan_item(AnalysisType.BENDING, None, p_feat, inputs, req, from_rule=False))
+                        processed_types.add(AnalysisType.BENDING)
 
         # 2. Process Explicitly Requested Analyses not yet processed
         for requested_type in req.requested_analyses:

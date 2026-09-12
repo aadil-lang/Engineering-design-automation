@@ -186,3 +186,42 @@ async def analyze_and_reason_drawing(
     req = ReasoningRequest(question=question, drawing=analysis)
     reasoning = reason_about_drawing(req)
     return AnalyzeAndReasonResponse(analysis=analysis, reasoning=reasoning)
+
+
+from design.models import DesignSpecificationRequest, DesignSpecificationResponse
+from design.extractor import DesignSpecificationExtractor
+from design.provider import get_design_provider
+from design.planner_bridge import plan_analyses_for_specification
+from design.report import generate_design_specification_report
+
+
+@router.post("/design/specification", response_model=DesignSpecificationResponse)
+async def create_design_specification(request: DesignSpecificationRequest):
+    """
+    Interprets natural language engineering problem statements into structured,
+    auditable Engineering Specifications (Slice 11).
+    Performs deterministic unit normalization, closed-form derivations (e.g. power + RPM -> torque),
+    missing information analysis, and links directly to downstream analysis planning.
+    """
+    try:
+        provider = get_design_provider(request.provider)
+        extractor = DesignSpecificationExtractor(provider=provider)
+        spec = extractor.extract(
+            problem_statement=request.problem_statement,
+            structured_inputs=request.engineering_inputs
+        )
+        plan = plan_analyses_for_specification(spec)
+        report = generate_design_specification_report(spec, plan)
+
+        return DesignSpecificationResponse(
+            specification=spec,
+            derived_values=spec.derived_values,
+            missing_information=spec.missing_information,
+            validation_issues=[c.description for c in spec.conflicts],
+            analysis_plan=plan,
+            report=report
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=422, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Design specification interpretation error: {str(e)}")
