@@ -24,7 +24,13 @@ DEFAULT_SOLVER_MAP: Dict[AnalysisType, str] = {
     AnalysisType.BEARING_STRESS: "pin_bearing_stress_v1",
     AnalysisType.HOLE_PATTERN_LOAD: "bolt_pattern_shear_v1",
     AnalysisType.VON_MISES: "von_mises_v1",
-    AnalysisType.THERMAL_EXPANSION: "thermal_strain_v1"
+    AnalysisType.THERMAL_EXPANSION: "thermal_strain_v1",
+
+    # Slice 10: Bolted Joint Solvers
+    AnalysisType.BOLT_TENSION: "py_mech_bolt_tension_v1",
+    AnalysisType.BOLT_SHEAR: "py_mech_bolt_shear_v1",
+    AnalysisType.BOLT_COMBINED_STRESS: "py_mech_bolt_combined_stress_v1",
+    AnalysisType.BOLT_PRELOAD: "py_mech_bolt_preload_v1"
 }
 
 # Default priorities by analysis type
@@ -38,7 +44,13 @@ DEFAULT_PRIORITIES: Dict[AnalysisType, str] = {
     AnalysisType.DEFLECTION: PRIORITY_MEDIUM,
     AnalysisType.BEARING_STRESS: PRIORITY_MEDIUM,
     AnalysisType.VON_MISES: PRIORITY_HIGH,
-    AnalysisType.THERMAL_EXPANSION: PRIORITY_LOW
+    AnalysisType.THERMAL_EXPANSION: PRIORITY_LOW,
+
+    # Slice 10: Bolted Joint Priorities
+    AnalysisType.BOLT_TENSION: PRIORITY_HIGH,
+    AnalysisType.BOLT_SHEAR: PRIORITY_HIGH,
+    AnalysisType.BOLT_COMBINED_STRESS: PRIORITY_HIGH,
+    AnalysisType.BOLT_PRELOAD: PRIORITY_MEDIUM
 }
 
 # Input specifications segregating calculation inputs vs safety assessment inputs
@@ -82,5 +94,23 @@ ANALYSIS_INPUT_SPECS: Dict[AnalysisType, Dict[str, List[str]]] = {
     AnalysisType.THERMAL_EXPANSION: {
         "calculation_inputs": ["initial_length", "delta_temperature", "thermal_expansion_coefficient"],
         "assessment_inputs": ["gap_clearance"]
+    },
+
+    # Slice 10: Bolted Joint Specs
+    AnalysisType.BOLT_TENSION: {
+        "calculation_inputs": ["bolt_diameter", "tensile_load"],
+        "assessment_inputs": ["allowable_tensile_stress"]
+    },
+    AnalysisType.BOLT_SHEAR: {
+        "calculation_inputs": ["bolt_diameter", "shear_load"],
+        "assessment_inputs": ["allowable_shear_stress"]
+    },
+    AnalysisType.BOLT_COMBINED_STRESS: {
+        "calculation_inputs": ["bolt_diameter", "tensile_load", "shear_load"],
+        "assessment_inputs": ["allowable_equivalent_stress"]
+    },
+    AnalysisType.BOLT_PRELOAD: {
+        "calculation_inputs": ["bolt_diameter", "preload_factor", "proof_stress"],
+        "assessment_inputs": []
     }
 }

@@ -1,5 +1,5 @@
 """
-Solver Runner orchestrating the execution of planned mechanical analyses against registered solvers.
+Solver Runner orchestrating the execution of planned mechanical analyses across machine elements.
 """
 
 from typing import Dict, List, Optional, Any
@@ -15,7 +15,8 @@ from solvers.validation import SolverValidationError
 
 class SolverRunner:
     """
-    Orchestrates execution of deterministic mechanical solvers for analysis plans.
+    Orchestrates execution of deterministic mechanical solvers across multiple machine elements
+    (Shafts, Bolted Joints, Beams, etc.).
     Validates plan item execution eligibility, resolves inputs and provenance from
     operating inputs and recognized drawing features, and produces CalculationCertificates.
     """
@@ -37,7 +38,6 @@ class SolverRunner:
         op_inputs = dict(operating_inputs or {})
 
         for item in plan.items:
-            # Only execute calculable items
             if not self.is_eligible_for_execution(item):
                 continue
 
@@ -116,6 +116,7 @@ class SolverRunner:
         Collects parameter values from:
         1. Feature attributes (if item references a feature_id or id)
         2. operating_inputs / available_inputs
+        Handles both shaft and bolted joint machine elements.
         """
         inputs: Dict[str, Any] = {}
         prov: Dict[str, InputProvenance] = {}
@@ -134,7 +135,8 @@ class SolverRunner:
         if target_feat and target_feat.attributes:
             feat_id = getattr(target_feat, "id", getattr(target_feat, "feature_id", "feat-0"))
             attrs = target_feat.attributes
-            # Diameter resolution
+
+            # Shaft Diameter & Length
             diam = attrs.get("nominal_diameter") or attrs.get("diameter") or attrs.get("shaft_diameter")
             if diam is not None:
                 inputs["shaft_diameter"] = float(diam)
@@ -145,13 +147,32 @@ class SolverRunner:
                     source_id=feat_id
                 )
 
-            # Length resolution
             length = attrs.get("length") or attrs.get("shaft_length")
             if length is not None:
                 inputs["shaft_length"] = float(length)
                 prov["shaft_length"] = InputProvenance(
                     value=float(length),
                     unit="mm",
+                    source="mechanical_semantics",
+                    source_id=feat_id
+                )
+
+            # Bolted Joint Attributes
+            bolt_d = attrs.get("bolt_diameter") or attrs.get("hole_diameter") or attrs.get("fastener_diameter")
+            if bolt_d is not None:
+                inputs["bolt_diameter"] = float(bolt_d)
+                prov["bolt_diameter"] = InputProvenance(
+                    value=float(bolt_d),
+                    unit="mm",
+                    source="mechanical_semantics",
+                    source_id=feat_id
+                )
+
+            bolt_cnt = attrs.get("bolt_count") or attrs.get("hole_count")
+            if bolt_cnt is not None:
+                inputs["bolt_count"] = int(bolt_cnt)
+                prov["bolt_count"] = InputProvenance(
+                    value=int(bolt_cnt),
                     source="mechanical_semantics",
                     source_id=feat_id
                 )
@@ -164,7 +185,7 @@ class SolverRunner:
                 source="engineering_inputs"
             )
 
-        # Aliases
+        # Aliases for Shaft
         if "diameter" in inputs and "shaft_diameter" not in inputs:
             inputs["shaft_diameter"] = inputs["diameter"]
             if "diameter" in prov:
@@ -174,5 +195,16 @@ class SolverRunner:
             inputs["bending_moment"] = inputs["moment"]
             if "moment" in prov:
                 prov["bending_moment"] = prov["moment"]
+
+        # Aliases for Bolted Joint
+        if "diameter" in inputs and "bolt_diameter" not in inputs and "shaft_diameter" not in inputs:
+            inputs["bolt_diameter"] = inputs["diameter"]
+            if "diameter" in prov:
+                prov["bolt_diameter"] = prov["diameter"]
+
+        if "bolt_nominal_diameter" in inputs and "bolt_diameter" not in inputs:
+            inputs["bolt_diameter"] = inputs["bolt_nominal_diameter"]
+            if "bolt_nominal_diameter" in prov:
+                prov["bolt_diameter"] = prov["bolt_nominal_diameter"]
 
         return inputs, prov

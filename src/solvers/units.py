@@ -9,6 +9,7 @@ from solvers.models import UnitConversion
 # Canonical SI units by physical dimension
 CANONICAL_SI_UNITS: Dict[str, str] = {
     "length": "m",
+    "area": "m^2",
     "force": "N",
     "torque": "N*m",
     "bending_moment": "N*m",
@@ -28,6 +29,16 @@ UNIT_CONVERSIONS: Dict[str, Dict[str, float]] = {
         "in": 0.0254,
         "inch": 0.0254,
         "inches": 0.0254,
+    },
+    "area": {
+        "m^2": 1.0,
+        "m2": 1.0,
+        "mm^2": 1e-6,
+        "mm2": 1e-6,
+        "cm^2": 1e-4,
+        "cm2": 1e-4,
+        "in^2": 0.00064516,
+        "in2": 0.00064516,
     },
     "force": {
         "N": 1.0,
@@ -105,7 +116,6 @@ def clean_unit_string(unit: str) -> str:
     if not unit:
         return ""
     u = unit.strip()
-    # Normalize common symbols
     u = u.replace("·", "*").replace("⋅", "*")
     return u
 
@@ -136,11 +146,9 @@ def normalize_unit(
 
     clean_u = clean_unit_string(unit)
 
-    # Check case-sensitive match first, then case-insensitive
     factor = dim_conversions.get(clean_u)
     matched_unit = clean_u
     if factor is None:
-        # Case insensitive fallback
         lower_map = {k.lower(): (k, v) for k, v in dim_conversions.items()}
         match = lower_map.get(clean_u.lower())
         if match:

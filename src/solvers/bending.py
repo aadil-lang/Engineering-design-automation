@@ -8,7 +8,8 @@ from solvers.base import MechanicalSolver
 from solvers.models import (
     CalculationCertificate,
     CalculationStep,
-    CertificateStatus
+    CertificateStatus,
+    MachineElementType
 )
 from solvers.units import normalize_unit, parse_input_value
 from solvers.validation import (
@@ -37,6 +38,10 @@ class ShaftBendingSolver(MechanicalSolver):
     @property
     def analysis_type(self) -> str:
         return "shaft_bending"
+
+    @property
+    def machine_element(self) -> MachineElementType:
+        return MachineElementType.SHAFT
 
     @property
     def required_inputs(self) -> List[str]:
@@ -199,6 +204,7 @@ class ShaftBendingSolver(MechanicalSolver):
             solver_version=self.solver_version,
             analysis_type=self.analysis_type,
             status=CertificateStatus.SUCCESS,
+            machine_element=self.machine_element,
             inputs=inputs,
             normalized_inputs=normalized,
             conversions=conversions,

@@ -33,11 +33,13 @@ def extract_feature_input_aliases(feature: Optional[MechanicalFeature]) -> Dict[
         if "diameter" in attrs:
             aliases["hole_diameter"] = attrs["diameter"]
             aliases["pin_diameter"] = attrs["diameter"]
+            aliases["bolt_diameter"] = attrs["diameter"]
 
     # Hole pattern attributes
     elif feature.feature_type == MechanicalFeatureType.HOLE_PATTERN:
         if "count" in attrs:
             aliases["hole_count"] = attrs["count"]
+            aliases["bolt_count"] = attrs["count"]
         if "pitch_circle_diameter" in attrs:
             aliases["pitch_radius"] = attrs["pitch_circle_diameter"] / 2.0
             aliases["pattern_pitch"] = attrs["pitch_circle_diameter"]
@@ -45,6 +47,10 @@ def extract_feature_input_aliases(feature: Optional[MechanicalFeature]) -> Dict[
             aliases["pattern_spacing"] = attrs["spacing"]
             if "pitch_radius" not in aliases:
                 aliases["pitch_radius"] = attrs["spacing"]
+        if "hole_diameter" in attrs:
+            aliases["bolt_diameter"] = attrs["hole_diameter"]
+        elif "diameter" in attrs:
+            aliases["bolt_diameter"] = attrs["diameter"]
 
     # Rectangular plate attributes
     elif feature.feature_type == MechanicalFeatureType.RECTANGULAR_PLATE:
@@ -83,7 +89,6 @@ def resolve_analysis_inputs(
     missing_assess: List[str] = []
 
     for req in calc_specs:
-        # Check direct presence
         val = combined.get(req)
         if val is not None:
             available_inputs.append(req)
@@ -103,6 +108,17 @@ def resolve_analysis_inputs(
                 available_inputs.append(req)
             elif req == "hole_count" and "count" in combined:
                 available_inputs.append(req)
+            # Bolted Joint Synonyms
+            elif req == "bolt_diameter" and any(k in combined for k in ("bolt_nominal_diameter", "diameter", "d", "D", "hole_diameter")):
+                available_inputs.append(req)
+            elif req == "tensile_load" and any(k in combined for k in ("F_t", "tension_load", "axial_load", "load", "force")):
+                available_inputs.append(req)
+            elif req == "shear_load" and any(k in combined for k in ("V", "shear_force", "transverse_load")):
+                available_inputs.append(req)
+            elif req == "preload_factor" and any(k in combined for k in ("k", "tightening_factor")):
+                available_inputs.append(req)
+            elif req == "proof_stress" and any(k in combined for k in ("S_p", "proof_strength")):
+                available_inputs.append(req)
             else:
                 missing_calc.append(req)
 
@@ -114,6 +130,12 @@ def resolve_analysis_inputs(
             if req == "material_allowable_stress" and any(k in combined for k in ("allowable_stress", "yield_strength", "Sy")):
                 available_inputs.append(req)
             elif req == "yield_strength" and "Sy" in combined:
+                available_inputs.append(req)
+            elif req == "allowable_tensile_stress" and any(k in combined for k in ("allowable_stress", "yield_strength", "Sy")):
+                available_inputs.append(req)
+            elif req == "allowable_shear_stress" and any(k in combined for k in ("allowable_shear", "tau_allow")):
+                available_inputs.append(req)
+            elif req == "allowable_equivalent_stress" and any(k in combined for k in ("allowable_stress", "yield_strength", "Sy")):
                 available_inputs.append(req)
             else:
                 missing_assess.append(req)

@@ -51,3 +51,18 @@ def validate_non_negative(param_name: str, value: float, unit: str = "") -> None
         raise SolverValidationError(
             f"Parameter '{param_name}' must be non-negative (>= 0), got: {value}{u_str}"
         )
+
+
+def validate_integer_positive(param_name: str, value: Any) -> int:
+    """Ensures parameter is a positive integer >= 1 (e.g. shear planes, bolt count)."""
+    try:
+        f_val = float(value)
+    except (ValueError, TypeError):
+        raise SolverValidationError(
+            f"Parameter '{param_name}' must be a valid integer, got: {value!r}"
+        )
+    if not f_val.is_integer() or f_val < 1:
+        raise SolverValidationError(
+            f"Parameter '{param_name}' must be an integer >= 1, got: {value}"
+        )
+    return int(f_val)

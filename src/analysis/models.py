@@ -15,6 +15,12 @@ class AnalysisType(str, Enum):
     VON_MISES = "von_mises"
     THERMAL_EXPANSION = "thermal_expansion"
 
+    # Slice 10: Bolted Joint Machine Element Analyses
+    BOLT_TENSION = "bolt_tension"
+    BOLT_SHEAR = "bolt_shear"
+    BOLT_COMBINED_STRESS = "bolt_combined_stress"
+    BOLT_PRELOAD = "bolt_preload"
+
 
 class AnalysisStatus(str, Enum):
     RECOMMENDED = "recommended"

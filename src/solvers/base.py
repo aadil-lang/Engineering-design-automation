@@ -10,7 +10,10 @@ from solvers.models import (
     CertificateStatus,
     AssessmentResult,
     AssessmentStatus,
-    InputProvenance
+    InputProvenance,
+    MachineElementType,
+    AnalysisCapability,
+    EngineeringAssumption
 )
 
 
@@ -41,6 +44,12 @@ class MechanicalSolver(ABC):
 
     @property
     @abstractmethod
+    def machine_element(self) -> MachineElementType:
+        """The primary machine element category (e.g., SHAFT, BOLTED_JOINT, BEAM)."""
+        pass
+
+    @property
+    @abstractmethod
     def required_inputs(self) -> List[str]:
         """List of required input parameter names."""
         pass
@@ -63,6 +72,20 @@ class MechanicalSolver(ABC):
         """Boundary conditions, stress concentrations, or geometric limitations."""
         pass
 
+    def get_capability(self) -> AnalysisCapability:
+        """Returns standard metadata describing this solver's capabilities and boundaries."""
+        return AnalysisCapability(
+            analysis_type=self.analysis_type,
+            machine_element=self.machine_element,
+            solver_id=self.solver_id,
+            required_inputs=self.required_inputs,
+            optional_inputs=self.optional_inputs,
+            applicability_criteria=f"Applicable to {self.machine_element.value} machine elements.",
+            is_solver_available=True,
+            can_assess=True,
+            limitations=self.default_limitations
+        )
+
     @abstractmethod
     def solve(
         self,
@@ -78,12 +101,18 @@ class MechanicalSolver(ABC):
     def _build_provenance_map(
         self,
         inputs: Dict[str, Any],
-        raw_provenance: Optional[Dict[str, Any]] = None
+        raw_provenance: Optional[Dict[str, Any]] = None,
+        assumed_provenance: Optional[Dict[str, InputProvenance]] = None
     ) -> Dict[str, InputProvenance]:
-        """Constructs typed InputProvenance objects for audit records."""
+        """
+        Constructs typed InputProvenance objects for audit records.
+        Strictly distinguishes user-provided data from assumed defaults or derived approximations.
+        """
         prov_map: Dict[str, InputProvenance] = {}
         raw_prov = raw_provenance or {}
+        assumed_prov = assumed_provenance or {}
 
+        # 1. Process inputs
         for k, v in inputs.items():
             if k in raw_prov:
                 entry = raw_prov[k]
@@ -94,18 +123,30 @@ class MechanicalSolver(ABC):
                         value=entry.get("value", v),
                         unit=entry.get("unit"),
                         source=entry.get("source", "engineering_inputs"),
-                        source_id=entry.get("source_id")
+                        source_id=entry.get("source_id"),
+                        is_assumed=entry.get("is_assumed", False),
+                        assumption_rationale=entry.get("assumption_rationale")
                     )
                 else:
                     prov_map[k] = InputProvenance(
                         value=v,
-                        source=str(entry)
+                        source=str(entry),
+                        is_assumed=False
                     )
+            elif k in assumed_prov:
+                prov_map[k] = assumed_prov[k]
             else:
                 prov_map[k] = InputProvenance(
                     value=v,
-                    source="engineering_inputs"
+                    source="engineering_inputs",
+                    is_assumed=False
                 )
+
+        # 2. Add any assumed parameters not explicitly in inputs (e.g., derived areas, default factors)
+        for k, entry in assumed_prov.items():
+            if k not in prov_map:
+                prov_map[k] = entry
+
         return prov_map
 
     def _generate_certificate_id(self) -> str:
@@ -142,7 +183,6 @@ class MechanicalSolver(ABC):
         allow_mpa = allowable_stress_pa / 1e6
         effective_allowable = allow_mpa / (design_factor if design_factor and design_factor > 0 else 1.0)
 
-        # FoS = allowable / calculated
         fos = (allow_mpa / calc_mpa) if calc_mpa > 1e-9 else float("inf")
         margin = (effective_allowable - calc_mpa) / effective_allowable if effective_allowable > 0 else 0.0
 

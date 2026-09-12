@@ -1,17 +1,18 @@
 """
-Deterministic execution planner for engineering analysis.
-Transforms mechanical semantics and applicability rules into a structured, auditable AnalysisPlan.
+Deterministic Analysis Planner formulating structured mechanical execution plans.
+Maps Slice 7 Engineering Rules and user requirements to candidate deterministic solvers.
 """
 
 import uuid
-from typing import List, Dict, Any, Optional, Set
-from semantics.models import MechanicalSemanticsResult, MechanicalFeatureType, MechanicalFeature
+from typing import Dict, List, Optional, Set, Any
+from core.models import MechanicalSemanticsResult
 from knowledge.models import EngineeringKnowledgeResult, EngineeringRuleMatch
+from semantics.models import MechanicalFeature, MechanicalFeatureType
 from analysis.models import (
     AnalysisType,
     AnalysisStatus,
-    AnalysisPlanItem,
     AnalysisPlan,
+    AnalysisPlanItem,
     AnalysisPlanningRequest
 )
 from analysis.config import (
@@ -37,13 +38,12 @@ RULE_TO_ANALYSIS_TYPE: Dict[str, AnalysisType] = {
 
 class AnalysisPlanner:
     """
-    Formulates a deterministic analysis execution plan based on mechanical semantics,
-    knowledge applicability rules, engineering inputs, and user preferences.
-    Does NOT perform numerical calculations.
+    Formulates a deterministic engineering analysis plan and execution schedule.
+    Evaluates semantic drawing features, rule applicability matches, and user overrides.
     """
 
-    def __init__(self, solver_registry: Optional[AnalysisSolverRegistry] = None):
-        self.registry = solver_registry or AnalysisSolverRegistry()
+    def __init__(self, registry: Optional[AnalysisSolverRegistry] = None):
+        self.registry = registry or AnalysisSolverRegistry()
 
     def create_plan(
         self,
@@ -52,18 +52,15 @@ class AnalysisPlanner:
         engineering_inputs: Optional[Dict[str, Any]] = None,
         request: Optional[AnalysisPlanningRequest] = None
     ) -> AnalysisPlan:
-        """
-        Generates an AnalysisPlan respecting knowledge rules and user controls.
-        User controls (requested / disabled) take precedence over automatic recommendations.
-        """
+        """Generates a complete, auditable AnalysisPlan."""
+        plan_id = f"plan-{uuid.uuid4().hex[:8]}"
         req = request or AnalysisPlanningRequest()
-        inputs = dict(req.engineering_inputs or (engineering_inputs or {}))
-        plan_id = f"plan_{uuid.uuid4().hex[:8]}"
+        inputs = dict(engineering_inputs or req.engineering_inputs or {})
 
         features = mechanical_semantics.features if mechanical_semantics else []
         features_by_id = {f.id: f for f in features}
 
-        # Index Slice 7 rule matches by rule_id
+        # Index Slice 7 rule matches
         rule_matches: Dict[str, EngineeringRuleMatch] = {}
         if engineering_knowledge and engineering_knowledge.applicable_rules:
             for rm in engineering_knowledge.applicable_rules:
@@ -72,7 +69,7 @@ class AnalysisPlanner:
         items: List[AnalysisPlanItem] = []
         processed_types: Set[AnalysisType] = set()
         warnings: List[str] = [
-            "Analysis plan formulated; deterministic mechanical calculations are pending solver implementation (Slice 9+).",
+            "Analysis plan formulated; deterministic mechanical calculations are executed when opt-in enabled.",
             "This plan is an engineering execution schedule and does NOT certify mechanical safety."
         ]
 
@@ -83,7 +80,6 @@ class AnalysisPlanner:
                 if not analysis_type or analysis_type in processed_types:
                     continue
 
-                # Associate primary feature (from evidence_ids or candidate lookup)
                 primary_feature: Optional[MechanicalFeature] = None
                 for ev_id in match.evidence_ids:
                     if ev_id in features_by_id:
@@ -103,6 +99,31 @@ class AnalysisPlanner:
                 items.append(item)
                 processed_types.add(analysis_type)
 
+            # 1b. Check explicit machine element classification in engineering inputs
+            elem_spec = str(inputs.get("machine_element", "")).lower()
+            if elem_spec in ("bolted_joint", "bolt", "fastener"):
+                if "tensile_load" in inputs and "shear_load" in inputs:
+                    if AnalysisType.BOLT_COMBINED_STRESS not in processed_types:
+                        p_feat = self._find_candidate_feature(AnalysisType.BOLT_COMBINED_STRESS, features)
+                        items.append(self._build_plan_item(AnalysisType.BOLT_COMBINED_STRESS, None, p_feat, inputs, req, from_rule=False))
+                        processed_types.add(AnalysisType.BOLT_COMBINED_STRESS)
+                elif "tensile_load" in inputs:
+                    if AnalysisType.BOLT_TENSION not in processed_types:
+                        p_feat = self._find_candidate_feature(AnalysisType.BOLT_TENSION, features)
+                        items.append(self._build_plan_item(AnalysisType.BOLT_TENSION, None, p_feat, inputs, req, from_rule=False))
+                        processed_types.add(AnalysisType.BOLT_TENSION)
+                elif "shear_load" in inputs:
+                    if AnalysisType.BOLT_SHEAR not in processed_types:
+                        p_feat = self._find_candidate_feature(AnalysisType.BOLT_SHEAR, features)
+                        items.append(self._build_plan_item(AnalysisType.BOLT_SHEAR, None, p_feat, inputs, req, from_rule=False))
+                        processed_types.add(AnalysisType.BOLT_SHEAR)
+
+                if "preload_factor" in inputs or "proof_stress" in inputs:
+                    if AnalysisType.BOLT_PRELOAD not in processed_types:
+                        p_feat = self._find_candidate_feature(AnalysisType.BOLT_PRELOAD, features)
+                        items.append(self._build_plan_item(AnalysisType.BOLT_PRELOAD, None, p_feat, inputs, req, from_rule=False))
+                        processed_types.add(AnalysisType.BOLT_PRELOAD)
+
         # 2. Process Explicitly Requested Analyses not yet processed
         for requested_type in req.requested_analyses:
             if requested_type in processed_types:
@@ -112,7 +133,6 @@ class AnalysisPlanner:
                         it.user_selected = True
                 continue
 
-            # User explicitly requested an analysis not automatically triggered by knowledge rules
             primary_feat = self._find_candidate_feature(requested_type, features)
             item = self._build_plan_item(
                 analysis_type=requested_type,
@@ -126,22 +146,20 @@ class AnalysisPlanner:
             items.append(item)
             processed_types.add(requested_type)
 
-        # 3. Apply Explicit User Disabled Overrides
+        # 3. Process Disabled Analyses Overrides
         for disabled_type in req.disabled_analyses:
-            # Check if already in items
-            found = False
-            for it in items:
-                if it.analysis_type == disabled_type:
-                    it.status = AnalysisStatus.USER_DISABLED
-                    it.user_disabled = True
-                    it.rationale = f"Analysis '{disabled_type.value}' was explicitly disabled by user override."
-                    found = True
-            if not found:
+            already_item = next((it for it in items if it.analysis_type == disabled_type), None)
+            if already_item:
+                already_item.status = AnalysisStatus.USER_DISABLED
+                already_item.user_disabled = True
+                already_item.rationale = f"Analysis '{disabled_type.value}' was explicitly disabled by user override."
+                already_item.limitations.append("Disabled by user request; excluded from planned execution.")
+            else:
                 items.append(
                     AnalysisPlanItem(
                         analysis_type=disabled_type,
                         status=AnalysisStatus.USER_DISABLED,
-                        priority=DEFAULT_PRIORITIES.get(disabled_type, PRIORITY_MEDIUM),
+                        priority="low",
                         rationale=f"Analysis '{disabled_type.value}' was explicitly disabled by user override.",
                         user_disabled=True,
                         limitations=["Disabled by user request; excluded from planned execution."]
@@ -154,7 +172,7 @@ class AnalysisPlanner:
 
         # 5. Compile Summary Sets
         ready_analyses = [it.analysis_type for it in items if it.status == AnalysisStatus.READY]
-        blocked_analyses = [it.analysis_type for it in items if it.status == AnalysisStatus.BLOCKED]
+        blocked_analyses = [it.analysis_type for it in items if it.status in (AnalysisStatus.BLOCKED, AnalysisStatus.MISSING_INPUTS)]
         recommended_analyses = [
             it.analysis_type for it in items
             if it.status in (AnalysisStatus.READY, AnalysisStatus.RECOMMENDED, AnalysisStatus.MISSING_INPUTS)
@@ -190,7 +208,6 @@ class AnalysisPlanner:
         solver_id = self.registry.get_solver_id(analysis_type)
         priority = DEFAULT_PRIORITIES.get(analysis_type, PRIORITY_MEDIUM)
 
-        # Resolve available, missing calculation, and missing assessment inputs
         resolved = resolve_analysis_inputs(
             analysis_type=analysis_type,
             engineering_inputs=engineering_inputs,
@@ -206,7 +223,6 @@ class AnalysisPlanner:
         feature_ids = [primary_feature.id] if primary_feature else []
         evidence_ids = list(rule_match.evidence_ids) if (rule_match and rule_match.evidence_ids) else list(feature_ids)
 
-        # Handle user disable check
         is_user_disabled = analysis_type in request.disabled_analyses
         is_user_selected = analysis_type in request.requested_analyses
 
@@ -221,7 +237,6 @@ class AnalysisPlanner:
             else:
                 rationale = f"Analysis '{analysis_type.value}' requested but cannot execute: missing required calculation input(s): {missing_str}."
         else:
-            # Calculation inputs are satisfied
             status = AnalysisStatus.READY
             if rule_match:
                 base_rationale = rule_match.rationale
@@ -243,7 +258,7 @@ class AnalysisPlanner:
         prereqs = [p.value for p in self.registry.get_prerequisites(analysis_type)]
 
         limitations = [
-            f"Execution target is planned deterministic solver '{solver_id}' (Slice 9+).",
+            f"Execution target is planned deterministic solver '{solver_id}'.",
             "Analysis plan does NOT perform numerical stress evaluation or certify safety."
         ]
         if rule_match and rule_match.limitations:
@@ -254,6 +269,8 @@ class AnalysisPlanner:
             assumptions.append("Equal load sharing among pattern fastener holes is assumed unless pitch-stiffness variation is modeled.")
         if analysis_type == AnalysisType.TORSION:
             assumptions.append("Uniform circular shaft cross-section; Saint-Venant torsional shear distribution assumed.")
+        if analysis_type in (AnalysisType.BOLT_TENSION, AnalysisType.BOLT_SHEAR, AnalysisType.BOLT_COMBINED_STRESS, AnalysisType.BOLT_PRELOAD):
+            assumptions.append("Bolted joint analytical calculation; prying and gasket relaxation not modeled.")
 
         confidence = rule_match.confidence if rule_match else 0.90
 
@@ -294,6 +311,11 @@ class AnalysisPlanner:
             return next((f for f in features if f.feature_type in (MechanicalFeatureType.HOLE, MechanicalFeatureType.SHAFT)), None)
         if analysis_type == AnalysisType.DEFLECTION:
             return next((f for f in features if f.feature_type in (MechanicalFeatureType.SHAFT, MechanicalFeatureType.RECTANGULAR_PLATE)), None)
+        if analysis_type in (AnalysisType.BOLT_TENSION, AnalysisType.BOLT_SHEAR, AnalysisType.BOLT_COMBINED_STRESS, AnalysisType.BOLT_PRELOAD):
+            hp = next((f for f in features if f.feature_type == MechanicalFeatureType.HOLE_PATTERN), None)
+            if hp:
+                return hp
+            return next((f for f in features if f.feature_type == MechanicalFeatureType.HOLE), None)
         return None
 
     def _check_prerequisites(self, items: List[AnalysisPlanItem]) -> None:
@@ -304,7 +326,6 @@ class AnalysisPlanner:
             prereqs = self.registry.get_prerequisites(it.analysis_type)
             for p in prereqs:
                 p_status = status_by_type.get(p)
-                # If prerequisite is user-disabled or blocked, mark dependent analysis as blocked
                 if p_status in (AnalysisStatus.USER_DISABLED, AnalysisStatus.BLOCKED):
                     it.status = AnalysisStatus.BLOCKED
                     it.rationale = f"Prerequisite analysis '{p.value}' is {p_status.value}; '{it.analysis_type.value}' is blocked."

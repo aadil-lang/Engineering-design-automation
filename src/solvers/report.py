@@ -1,5 +1,6 @@
 """
 Deterministic markdown calculation report generator for mechanical solver certificates.
+Includes detailed tracking of engineering assumptions and fallback parameters.
 """
 
 from typing import List, Union
@@ -76,11 +77,23 @@ def generate_calculation_report(
             lines.append("")
 
         # 4. Physical Assumptions
-        if cert.assumptions:
+        if cert.assumptions or cert.tracked_assumptions:
             lines.append("### 4. Physical Assumptions")
-            for asm in cert.assumptions:
-                lines.append(f"- {asm}")
-            lines.append("")
+            if cert.tracked_assumptions:
+                lines.append("#### Explicit Engineering Assumptions & Defaults")
+                lines.append("| Parameter | Value | Category | Rationale | User Provided? |")
+                lines.append("|---|---|---|---|---|")
+                for ea in cert.tracked_assumptions:
+                    unit_str = f" {ea.unit}" if ea.unit else ""
+                    lines.append(
+                        f"| `{ea.parameter}` | {ea.value}{unit_str} | `{ea.category}` | {ea.rationale} | {'Yes' if ea.is_user_provided else 'No (Assumed)'} |"
+                    )
+                lines.append("")
+
+            if cert.assumptions:
+                for asm in cert.assumptions:
+                    lines.append(f"- {asm}")
+                lines.append("")
 
         # 5. Engineering Limitations
         if cert.limitations:
