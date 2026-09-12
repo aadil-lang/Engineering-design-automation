@@ -20,6 +20,7 @@ class DrawingContext(BaseModel):
     associations: List[Dict[str, Any]] = Field(default_factory=list)
     ocr_results: List[Dict[str, Any]] = Field(default_factory=list)
     mechanical_features: List[Dict[str, Any]] = Field(default_factory=list)
+    engineering_knowledge: Optional[Dict[str, Any]] = None
     summary: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -144,6 +145,15 @@ def build_drawing_context(analysis: AnalyzeResponse) -> DrawingContext:
         if ms and ms.summary:
             summary.update({"mechanical_summary": ms.summary})
 
+    # Slice 7: Engineering Knowledge Evidence
+    eng_knowledge: Optional[Dict[str, Any]] = None
+    if getattr(analysis, "engineering_knowledge", None):
+        ek = analysis.engineering_knowledge
+        if ek:
+            eng_knowledge = ek.model_dump()
+            if ek.applicable_rules:
+                summary.update({"applicable_engineering_rules_count": len(ek.applicable_rules)})
+
     return DrawingContext(
         image=image_meta,
         line_features=line_feats,
@@ -155,6 +165,7 @@ def build_drawing_context(analysis: AnalyzeResponse) -> DrawingContext:
         associations=assocs,
         ocr_results=ocr_items,
         mechanical_features=mech_feats,
+        engineering_knowledge=eng_knowledge,
         summary=summary
     )
 
@@ -197,6 +208,24 @@ def select_context_for_question(
                 mf for mf in context.mechanical_features
                 if mf.get("feature_type") in ("hole", "hole_pattern", "circular_feature")
             ]
+        if context.engineering_knowledge:
+            ek = context.engineering_knowledge
+            filtered_rules = [
+                r for r in ek.get("applicable_rules", [])
+                if any(k in r.get("rule_id", "") for k in ("hole", "pattern", "material"))
+            ]
+            filtered_items = [
+                it for it in ek.get("items", [])
+                if any(f in it.get("related_features", []) for f in ("hole", "hole_pattern"))
+            ]
+            result["engineering_knowledge"] = {
+                "applicable_rules": filtered_rules,
+                "items": filtered_items,
+                "missing_information": [
+                    m for m in ek.get("missing_information", [])
+                    if not m.get("rule_id") or any(k in m.get("rule_id", "") for k in ("hole", "pattern", "material"))
+                ]
+            }
         return result
 
     if question_type == QuestionType.DIMENSION_SUMMARY:
@@ -229,6 +258,8 @@ def select_context_for_question(
                 mf for mf in context.mechanical_features
                 if mf.get("feature_type") in ("parallel_feature", "perpendicular_feature", "symmetric_feature")
             ]
+        if context.engineering_knowledge:
+            result["engineering_knowledge"] = context.engineering_knowledge
         return result
 
     if question_type == QuestionType.GEOMETRY_SUMMARY:
@@ -248,6 +279,8 @@ def select_context_for_question(
                 mf for mf in context.mechanical_features
                 if mf.get("feature_type") in ("rectangular_plate", "slot", "shaft", "stepped_feature", "symmetric_feature", "circular_feature", "hole")
             ]
+        if context.engineering_knowledge:
+            result["engineering_knowledge"] = context.engineering_knowledge
         return result
 
     if question_type == QuestionType.ANNOTATION_SUMMARY:
@@ -276,6 +309,8 @@ def select_context_for_question(
     }
     if context.mechanical_features:
         result["mechanical_features"] = context.mechanical_features
+    if context.engineering_knowledge:
+        result["engineering_knowledge"] = context.engineering_knowledge
     return result
 
 

@@ -84,9 +84,10 @@ class EngineeringFeatures(BaseModel):
     bounding_information: BoundingInformation
     summary: Dict[str, Any]
 
-# API Response model encompassing Slice 1, Slice 2, Slice 3, and Slice 6
+# API Response model encompassing Slice 1, Slice 2, Slice 3, Slice 6, and Slice 7
 
 from semantics.models import MechanicalSemanticsResult
+from knowledge.models import EngineeringKnowledgeResult
 
 class AnalyzeResponse(BaseModel):
     image: ImageMetadata
@@ -96,3 +97,4 @@ class AnalyzeResponse(BaseModel):
     engineering_features: Optional[EngineeringFeatures] = None
     annotations: Optional[AnnotationsResult] = None
     mechanical_semantics: Optional[MechanicalSemanticsResult] = None
+    engineering_knowledge: Optional[EngineeringKnowledgeResult] = None
