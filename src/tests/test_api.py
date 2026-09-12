@@ -28,6 +28,16 @@ def test_analyze_success(synthetic_image_bytes):
     assert "bounding_information" in eng_features
     assert "summary" in eng_features
 
+    # Assert Slice 3: Annotations, Dimensions, Symbols, Associations
+    assert "annotations" in data
+    assert data["annotations"] is not None
+    annotations = data["annotations"]
+    assert "ocr_results" in annotations
+    assert "dimensions" in annotations
+    assert "symbols" in annotations
+    assert "associations" in annotations
+    assert "summary" in annotations
+
 def test_analyze_empty_file(empty_image_bytes):
     files = {"file": ("empty.png", empty_image_bytes, "image/png")}
     response = client.post("/analyze", files=files)

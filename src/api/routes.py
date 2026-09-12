@@ -3,6 +3,7 @@ from core.models import AnalyzeResponse
 from vision.processor import load_and_validate_image
 from vision.detector import extract_features
 from geometry.extractor import extract_engineering_features
+from annotations.extractor import extract_annotations
 
 router = APIRouter()
 
@@ -16,21 +17,26 @@ async def analyze_drawing(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
-    # Process Image
+    # 1. Process & Validate Image
     img = load_and_validate_image(contents)
     
-    # Extract Low-Level CV Features (Slice 1)
+    # 2. Extract Low-Level CV Features (Slice 1)
     cv_response = extract_features(img)
     
-    # Extract High-Level Engineering Features (Slice 2)
+    # 3. Extract High-Level Engineering Features (Slice 2)
     engineering_features = extract_engineering_features(
         cv_response.lines,
         cv_response.circles,
         cv_response.contours,
         cv_response.image
     )
-    
-    # Enrich the response
     cv_response.engineering_features = engineering_features
+    
+    # 4. Extract Annotations, Dimensions, Symbols, and Associations (Slice 3)
+    annotations = extract_annotations(
+        image=img,
+        engineering_features=engineering_features
+    )
+    cv_response.annotations = annotations
     
     return cv_response

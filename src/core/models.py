@@ -1,6 +1,17 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Tuple, Dict, Any
 from enum import Enum
+from annotations.models import (
+    OCRResult,
+    Dimension,
+    DimensionType,
+    Tolerance,
+    EngineeringSymbol,
+    SymbolType,
+    GeometryAssociation,
+    AssociationType,
+    AnnotationsResult
+)
 
 class ImageMetadata(BaseModel):
     width: int
@@ -73,9 +84,12 @@ class EngineeringFeatures(BaseModel):
     bounding_information: BoundingInformation
     summary: Dict[str, Any]
 
+# API Response model encompassing Slice 1, Slice 2, and Slice 3
+
 class AnalyzeResponse(BaseModel):
     image: ImageMetadata
     lines: List[Line]
     circles: List[Circle]
     contours: List[Contour]
     engineering_features: Optional[EngineeringFeatures] = None
+    annotations: Optional[AnnotationsResult] = None
