@@ -10,6 +10,7 @@ from semantics.extractor import extract_mechanical_semantics
 from knowledge.applicability import EngineeringApplicabilityEngine
 from analysis.models import AnalysisPlanningRequest
 from analysis.planner import AnalysisPlanner
+from solvers.runner import SolverRunner
 from reasoning.models import (
     ReasoningRequest,
     ReasoningResponse,
@@ -23,9 +24,10 @@ router = APIRouter()
 async def _run_analysis_pipeline(
     file: UploadFile,
     engineering_inputs: Optional[Dict[str, Any]] = None,
-    planning_request: Optional[AnalysisPlanningRequest] = None
+    planning_request: Optional[AnalysisPlanningRequest] = None,
+    execute_analyses: bool = False
 ) -> AnalyzeResponse:
-    """Internal helper running the complete Slice 1-3, 6, 7, and 8 CV, annotation, semantic, knowledge, and planning pipeline."""
+    """Internal helper running the complete Slice 1-3, 6, 7, 8, and optional 9 CV, annotation, semantic, knowledge, planning, and solver pipeline."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
 
@@ -83,6 +85,17 @@ async def _run_analysis_pipeline(
     )
     cv_response.analysis_plan = analysis_plan
 
+    # 8. Deterministic Mechanical Solver Execution (Slice 9)
+    if execute_analyses and analysis_plan:
+        runner = SolverRunner()
+        features = mechanical_semantics.features if mechanical_semantics else None
+        certificates = runner.execute_plan(
+            plan=analysis_plan,
+            features=features,
+            operating_inputs=engineering_inputs
+        )
+        cv_response.calculation_certificates = certificates
+
     return cv_response
 
 
@@ -90,12 +103,13 @@ async def _run_analysis_pipeline(
 async def analyze_drawing(
     file: UploadFile = File(...),
     engineering_inputs: Optional[str] = Form(None),
-    planning_request: Optional[str] = Form(None)
+    planning_request: Optional[str] = Form(None),
+    execute_analyses: bool = Form(False)
 ):
     """
     Analyzes an uploaded engineering drawing image and returns structured CV primitives,
     engineering features, relationships, annotations, mechanical engineering semantics,
-    applicable engineering knowledge, and deterministic analysis execution plan.
+    applicable engineering knowledge, analysis execution plan, and optional calculation certificates.
     """
     inputs_dict = None
     if engineering_inputs:
@@ -112,7 +126,12 @@ async def analyze_drawing(
         except Exception:
             plan_req = None
 
-    return await _run_analysis_pipeline(file, engineering_inputs=inputs_dict, planning_request=plan_req)
+    return await _run_analysis_pipeline(
+        file,
+        engineering_inputs=inputs_dict,
+        planning_request=plan_req,
+        execute_analyses=execute_analyses
+    )
 
 
 @router.post("/reason", response_model=ReasoningResponse)
@@ -135,7 +154,8 @@ async def analyze_and_reason_drawing(
     file: UploadFile = File(...),
     question: str = Form(...),
     engineering_inputs: Optional[str] = Form(None),
-    planning_request: Optional[str] = Form(None)
+    planning_request: Optional[str] = Form(None),
+    execute_analyses: bool = Form(False)
 ):
     """
     Convenience endpoint combining analysis and grounded engineering reasoning.
@@ -157,7 +177,12 @@ async def analyze_and_reason_drawing(
         except Exception:
             plan_req = None
 
-    analysis = await _run_analysis_pipeline(file, engineering_inputs=inputs_dict, planning_request=plan_req)
+    analysis = await _run_analysis_pipeline(
+        file,
+        engineering_inputs=inputs_dict,
+        planning_request=plan_req,
+        execute_analyses=execute_analyses
+    )
     req = ReasoningRequest(question=question, drawing=analysis)
     reasoning = reason_about_drawing(req)
     return AnalyzeAndReasonResponse(analysis=analysis, reasoning=reasoning)
