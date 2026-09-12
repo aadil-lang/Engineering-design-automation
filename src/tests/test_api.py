@@ -11,10 +11,22 @@ def test_analyze_success(synthetic_image_bytes):
     assert response.status_code == 200
     data = response.json()
     
+    # Assert Slice 1
     assert "image" in data
     assert "lines" in data
     assert "circles" in data
     assert "contours" in data
+    
+    # Assert Slice 2
+    assert "engineering_features" in data
+    assert data["engineering_features"] is not None
+    
+    eng_features = data["engineering_features"]
+    assert "line_features" in eng_features
+    assert "circle_features" in eng_features
+    assert "relationships" in eng_features
+    assert "bounding_information" in eng_features
+    assert "summary" in eng_features
 
 def test_analyze_empty_file(empty_image_bytes):
     files = {"file": ("empty.png", empty_image_bytes, "image/png")}
