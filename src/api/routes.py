@@ -225,3 +225,57 @@ async def create_design_specification(request: DesignSpecificationRequest):
         raise HTTPException(status_code=422, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Design specification interpretation error: {str(e)}")
+
+
+from design_engine.models import DesignRequest, DesignResponse, DesignObjective, ShaftDesignRequirements
+from design_engine.designer import design_from_specification, design_from_problem_statement, ShaftDesigner
+
+
+@router.post("/design", response_model=DesignResponse)
+async def create_parametric_design(request: DesignRequest):
+    """
+    Parametric Mechanical Design Engine endpoint (Slice 12).
+    Generates, evaluates, and ranks deterministic candidate designs based on an
+    EngineeringSpecification or natural-language problem statement.
+    """
+    try:
+        obj = None
+        if request.objective:
+            try:
+                obj = DesignObjective(request.objective)
+            except ValueError:
+                pass
+
+        if request.specification:
+            res = design_from_specification(
+                spec=request.specification,
+                extra_inputs=request.engineering_inputs,
+                constraints=request.design_constraints,
+                objective=obj
+            )
+        elif request.problem_statement:
+            res = design_from_problem_statement(
+                statement=request.problem_statement,
+                extra_inputs=request.engineering_inputs,
+                constraints=request.design_constraints,
+                objective=obj
+            )
+        elif request.engineering_inputs:
+            req = ShaftDesignRequirements(**request.engineering_inputs)
+            designer = ShaftDesigner()
+            res = designer.design(
+                req=req,
+                objective=obj or DesignObjective.MINIMIZE_SHAFT_DIAMETER
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Must provide problem_statement, specification, or engineering_inputs.")
+
+        return DesignResponse(
+            result=res,
+            report=res.report or ""
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=422, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Mechanical design synthesis error: {str(e)}")
+
