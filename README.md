@@ -115,11 +115,11 @@ flowchart TD
 ### Verified Reference Execution
 
 **Input Requirement**:
-> *"Design a solid circular transmission shaft made of AISI 1045 to transmit 7.5 kW at 1200 RPM with a factor of safety of 2.2."* (Length: $L = 350.0\\text{ mm}$)
+> *"Design a solid circular transmission shaft made of AISI 1045 to transmit 7.5 kW at 1200 RPM with a factor of safety of 2.2."* (Length: $L = 350.0\text{ mm}$)
 
 **Execution Chain**:
 1. **Extraction & Provenance**:
-   - $P = 7.5\\text{ kW}$, $N = 1200.0\\text{ RPM}$, $\\text{FoS}_{\\text{req}} = 2.2$, $L = 350.0\\text{ mm}$, Material: `AISI 1045` (Confidence: 1.0)
+   - $P = 7.5\\text{ kW}$, $N = 1200.0\\text{ RPM}$, $\\text{FoS}_{\\text{req}} = 2.2$, $L = 350.0\text{ mm}$, Material: `AISI 1045` (Confidence: 1.0)
 2. **Material Knowledge Resolution**:
    - Resolved Record: `AISI 1045` (Normalized condition per ASTM A29 / ISO 683-1)
    - Yield Strength: $S_y = 310.0\\text{ MPa}$ (Source: Knowledge Base, Status: `Verified`)
@@ -129,16 +129,16 @@ flowchart TD
    - Shear yield strength (von Mises): $S_{sy} = 0.57735 \\cdot 310.0\\text{ MPa} = 178.98\\text{ MPa}$
    - Allowable shear stress: $\\tau_{\\text{allow}} = \\frac{S_{sy}}{\\text{FoS}_{\\text{req}}} = \\frac{178.98\\text{ MPa}}{2.20} = 81.35\\text{ MPa}$
    - Theoretical minimum diameter:
-     $$d_{\\text{req}} = \\left( \\frac{16 \\cdot T}{\\pi \\cdot \\tau_{\\text{allow}}} \\right)^{1/3} = \\left( \\frac{16 \\cdot 59.683}{\\pi \\cdot 8.135 \\times 10^7} \\right)^{1/3} = 15.52\\text{ mm}$$
+     $$d_{\\text{req}} = \\left( \\frac{16 \\cdot T}{\\pi \\cdot \\tau_{\\text{allow}}} \\right)^{1/3} = \\left( \\frac{16 \\cdot 59.683}{\\pi \\cdot 8.135 \\times 10^7} \\right)^{1/3} = 15.52\text{ mm}$$
 4. **Configured Nominal Diameter Selection**:
    - Series Policy: `metric_nominal_shaft_series_r20_custom` (`[6, 8, 10, 12, 14, 15, 16, 18, 20, ..., 200 mm]`)
-   - Selected: $d_{\\text{nominal}} = 16.0\\text{ mm}$ (Smallest standard diameter $\\ge 15.52\\text{ mm}$)
+   - Selected: $d_{\\text{nominal}} = 16.0\text{ mm}$ (Smallest standard diameter $\\ge 15.52\text{ mm}$)
 5. **Stress Evaluation & Constraint Validation**:
    - Design torsional shear stress: $\\tau_{\\text{design}} = \\frac{16 \\cdot 59.683}{\\pi \\cdot (0.0160)^3} = 74.21\\text{ MPa}$
    - Achieved Factor of Safety: $\\text{FoS}_{\\text{achieved}} = \\frac{178.98\\text{ MPa}}{74.21\\text{ MPa}} = 2.41$
    - Constraint Check: `Yield-Strength Design Constraint Satisfied (τ_design ≤ τ_allow)`
 6. **CAD, 2D Drawing & Cross-Validation**:
-   - 3D BRep Volume: $70,371.68\\text{ mm}^3$ (Theoretical: $70,371.68\\text{ mm}^3$, Error: $0.0000\\%$)
+   - 3D BRep Volume: $70,371.68\text{ mm}^3$ (Theoretical: $70,371.68\text{ mm}^3$, Error: $0.0000\\%$)
    - STEP Export: `shaft_16x350.stp` (3,237 bytes)
    - 2D Drawing: `shaft_16x350_drawing.svg` (6,242 bytes)
    - Dimensional Agreement: Diameter Match (16.0 mm == 16.0 mm), Length Match (350.0 mm == 350.0 mm) -> **100% Match**.
@@ -153,9 +153,9 @@ The Material Knowledge Base provides deterministic lookup backed by published in
 
 | Identifier | Designation | Category | $S_y$ (MPa) | $S_{ut}$ (MPa) | $E$ (GPa) | $\\nu$ | $\\rho$ ($\\text{kg/m}^3$) | Standard / Condition Reference |
 |---|---|---|---|---|---|---|---|---|
-| `mat_s235jr` | **S235JR** | Structural Steel | 235.0 | 360.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\\text{ mm}$) |
-| `mat_s275jr` | **S275JR** | Structural Steel | 275.0 | 430.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\\text{ mm}$) |
-| `mat_s355j2` | **S355J2** | Structural Steel | 355.0 | 510.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\\text{ mm}$) |
+| `mat_s235jr` | **S235JR** | Structural Steel | 235.0 | 360.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\text{ mm}$) |
+| `mat_s275jr` | **S275JR** | Structural Steel | 275.0 | 430.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\text{ mm}$) |
+| `mat_s355j2` | **S355J2** | Structural Steel | 355.0 | 510.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\text{ mm}$) |
 | `mat_aisi_1018` | **AISI 1018** | Carbon Steel | 370.0 | 440.0 | 205.0 | 0.29 | 7870 | ASTM A29 / ASTM A108 (Cold Drawn) |
 | `mat_aisi_1045` | **AISI 1045** | Carbon Steel | 310.0 | 565.0 | 206.0 | 0.29 | 7850 | ASTM A29 / ISO 683-1 (Normalized) |
 | `mat_aisi_4140` | **AISI 4140** | Alloy Steel | 655.0 | 930.0 | 210.0 | 0.30 | 7850 | ASTM A29 / ISO 683-2 (Q&T @ 600°C) |
@@ -189,7 +189,7 @@ The V1 solver models a solid circular transmission shaft subjected to pure stead
    $$d_{\\text{req}} = \\left( \\frac{16 \\cdot T}{\\pi \\cdot \\tau_{\\text{allow}}} \\right)^{1/3} \\quad [\\text{m}]$$
 6. **Configured Nominal Diameter Selection**:
    $$d_{\\text{nominal}} = \\min \\{ d \\in \\mathcal{S}_{\\text{nominal}} \\mid d \\ge d_{\\text{req}} \\}$$
-   Where $\\mathcal{S}_{\\text{nominal}} = [6, 8, 10, 12, 14, 15, 16, 17, 18, 20, 22, 24, 25, 28, 30, \\dots, 200]\\text{ mm}$.
+   Where $\\mathcal{S}_{\\text{nominal}} = [6, 8, 10, 12, 14, 15, 16, 17, 18, 20, 22, 24, 25, 28, 30, \\dots, 200]\text{ mm}$.
 7. **Design Stress & Achieved Factor of Safety**:
    $$\\tau_{\\text{design}} = \\frac{16 \\cdot T}{\\pi \\cdot d_{\\text{nominal}}^3}, \\quad \\text{FoS}_{\\text{achieved}} = \\frac{S_{sy}}{\\tau_{\\text{design}}}$$
 8. **Design Constraint Check**:
@@ -369,7 +369,7 @@ collected 424 items
 ### Verified Test Areas:
 - **Material Knowledge Base**: Schema validation, boundary checks, case/whitespace normalization, explicit $S_y$ override, and generic steel blocking.
 - **Analytical Physics Solvers**: Torsion, bending, combined stress, distortion energy theory, and unit conversions.
-- **Diameter Selection Policy**: Boundary tests (e.g. $d_{\\text{req}} = 11.999999\\text{ mm} \\to d_{\\text{nominal}} = 12.0\\text{ mm}$) and maximum diameter bounds.
+- **Diameter Selection Policy**: Boundary tests (e.g. $d_{\\text{req}} = 11.999999\text{ mm} \\to d_{\\text{nominal}} = 12.0\text{ mm}$) and maximum diameter bounds.
 - **CAD & Drawing Integration**: OpenCascade solid synthesis, theoretical volume verification ($0.0000\\%$ error), STEP export, and CAD <-> drawing dimensional cross-validation.
 - **Failure Paths**: Missing parameters (length, yield strength, power, speed) halt cleanly with `BLOCKED`/`INVALID` status without triggering CAD generation.
 - **API & UI Contracts**: Full endpoint contracts, static file serving, and error handling.
@@ -446,7 +446,7 @@ curl -X POST "http://localhost:8000/design/pipeline" \
 ### Current Scope (V1)
 - **Component**: Solid circular transmission shafts under steady torsional loading.
 - **Materials**: Standard engineering grades in baseline nominal conditions (EN 10025-2, ASTM A29/A108/A240/B221, ISO 683).
-- **Nominal Sizes**: Standard metric series from $6.0\\text{ mm}$ to $200.0\\text{ mm}$.
+- **Nominal Sizes**: Standard metric series from $6.0\text{ mm}$ to $200.0\text{ mm}$.
 
 ### Engineering Disclaimer
 > **Disclaimer**: This system is an automated engineering design-assistance prototype. Generated calculations, CAD models, and technical drawings are preliminary sizing outputs. They do not constitute formal manufacturing approval or certified professional engineering sign-off. All outputs must be reviewed and approved by a qualified engineer before production release.
@@ -473,12 +473,12 @@ This project demonstrates how AI and classical engineering software can be combi
 
 ## 18. Domain Background & Author Context
 
-This project is grounded in the author's academic and practical mechanical-engineering background:
+This project is authored by a **Mechanical Engineering graduate (B.Tech in Mechanical Engineering)** and is directly informed by academic study in machine design and practical CAD experience:
 
-- **Academic Foundations**: Formal coursework and academic study in **Design of Machine Elements**, mechanics of materials, and failure theories (von Mises distortion energy, maximum shear stress, factor of safety formulation).
+- **Academic Foundations**: Degree training in **Design of Machine Elements**, strength of materials, continuum mechanics, and failure criteria (von Mises distortion energy, maximum shear stress theory, factor of safety formulation).
 - **CAD & Mechanical Design Experience**: Prior hands-on experience in 3D parametric solid modeling, dimensional tolerancing, and orthographic drafting workflows using **PTC Creo Parametric**.
 
-This domain context directly informed key architectural decisions across the system:
+This domain background directly informed key architectural decisions across the system:
 1. **Strict Separation of AI from Mechanics**: Enforcing that language models interpret human intent while deterministic closed-form physics engines handle all stress, torque, and diameter calculations.
 2. **Standard Nominal Sizing Policies**: Recognizing that theoretical calculated dimensions (e.g., $15.52\text{ mm}$) must map to configured standard stock series ($16.0\text{ mm}$) for practical manufacturability.
 3. **Automated Drawing & CAD Cross-Validation**: Mirroring traditional mechanical engineering drawing review workflows where 2D manufacturing callouts must rigorously reconcile with 3D solid geometry before handoff.
