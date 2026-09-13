@@ -1,214 +1,448 @@
-# Mechanical Engineering Drawing Intelligence
+# AI-Assisted Engineering Design Automation
 
-## Purpose
-An AI-assisted system that analyzes mechanical engineering drawing images and converts them into a structured representation suitable for downstream engineering reasoning.
+> Natural-language engineering requirements -> structured engineering specifications -> material knowledge resolution -> deterministic design calculations -> validated CAD artifacts.
 
-## Architecture
-
-```
-Engineering Drawing Image
-        ↓
-Slice 1: Computer Vision
-        ↓ (Lines / Circles / Contours)
-Slice 2: Geometric Reasoning
-        ↓ (Orientations / Relationships / Hole Candidates)
-Slice 3: Dimensions + OCR + Symbols
-        ↓ (Structured Annotations & Candidate Associations)
-Slice 4: Grounded Engineering Reasoning
-        ↓ (Question Router → Context Selector → Grounded Prompts → LLM → Evidence Validator)
-Evidence-Grounded Engineering Answer
-```
-
-- **Core Models:** Typed Pydantic models for geometric entities (Lines, Circles, Contours), engineering features, annotations, and reasoning responses.
-- **Vision Processing (Slice 1):** OpenCV-based pipeline for noise reduction, edge detection, and geometric primitive extraction.
-- **Geometry Processing (Slice 2):** High-level layer that transforms low-level OpenCV primitives into contextual engineering relationships.
-- **Annotations & Dimensions (Slice 3):** Dedicated OCR preprocessing, pluggable OCR abstraction, deterministic dimension and engineering symbol parsing, and candidate spatial geometry association.
-- **Grounded Reasoning (Slice 4):** Evidence-grounded reasoning layer that answers engineering questions strictly based on structured drawing evidence, with deterministic question routing, token-efficient context selection, and hallucination-preventing post-generation validation.
-- **API:** FastAPI endpoints (`POST /analyze`, `POST /reason`, `POST /analyze-and-reason`).
-
-## Current Capabilities (Slice 4)
-- Validates and loads uploaded image files.
-- Detects straight lines (`HoughLinesP`), circles (`HoughCircles`), and contours.
-- **Engineering Feature Extraction:**
-  - Infers deterministic orientations (Horizontal, Vertical, Diagonal) with angular tolerances.
-  - Generates Line and Circle features with hole candidate heuristics.
-  - Detects spatial relationships (parallelism, perpendicularity, endpoint connectivity).
-- **Dimensions and Annotation Extraction:**
-  - Dedicated OCR image enhancement (CLAHE, upscaling, denoising, adaptive thresholding).
-  - OCR abstraction layer supporting local and mock OCR engines without internet/cloud dependencies.
-  - Deterministic parsing of engineering dimensions (linear, diameter, radius, angular, symmetric/bilateral tolerances, unit suffixes).
-  - Deterministic symbol detection (Ø, ⌀, R, ±, °, and preparatory GD&T representations).
-  - Spatial candidate association between dimension bounding boxes and nearby geometric lines/circles.
-- **Grounded Engineering Reasoning:**
-  - Answers specific engineering queries using structured evidence without raw pixel hallucination.
-  - Categorizes queries deterministically via regex/keyword routing (`hole_analysis`, `dimension_summary`, `relationship_analysis`, `geometry_summary`, `annotation_summary`).
-  - Context selection strategy minimizes token consumption by transmitting only relevant entities per category.
-  - Strictly distinguishes **Detected Facts**, **Inferences**, and **Uncertainties**.
-  - Validates every referenced entity ID (`circle_0`, `dim_1`) against the grounded context, demoting and penalizing unsupported claims.
-  - Surfaces contradictory evidence (e.g., conflicting measurement vs callout) as explicit uncertainties.
+An engineering design-assistance platform that translates natural-language engineering requirements into structured parameters, resolves material properties against a deterministic knowledge base, executes closed-form mechanical sizing equations, synthesizes parametric 3D BRep CAD models, and exports 2D technical drawings with dimensional cross-validation.
 
 ---
 
-## Dimensions and Annotation Extraction
+## Central Design Philosophy
 
-### Architectural Separation
-- **OCR is separated from engineering interpretation:** The raw optical character detection produces candidate text tokens and bounding boxes without assuming engineering meaning.
-- **Raw OCR text is preserved:** All original detected text strings (`raw_text`) and source IDs are preserved alongside parsed numeric values.
-- **Deterministic notation parsing:** Dimension strings are parsed using deterministic regex rules rather than probabilistic models. Supported notations include:
-  - Plain linear dimensions (e.g., `50`, `25.5`, `100`)
-  - Diameter callouts (e.g., `Ø20`, `⌀20`, `Dia 20`, `D20` [heuristic])
-  - Radius callouts (e.g., `R10`, `R 10`, `Rad 10`)
-  - Angular callouts (e.g., `45°`, `45 deg`, `45 degree`)
-  - Tolerances (symmetric `50 ±0.02`, `50 +/- 0.02`; bilateral `50 +0.02/-0.01`)
-  - Units (`mm`, `cm`, `in`, `inch`). Units are returned as `null` if not explicitly present; the system never fabricates units.
-- **Candidate-based geometry association:** Dimensions are spatially linked to nearby geometric features (lines or circles) based on Euclidean distance thresholds. These links are explicitly marked as candidate associations (`association_type`, `distance`, `confidence`) rather than guaranteed semantic ground truth.
+```
+Natural Language / Drawing Intent (AI & Computer Vision)
+                       ↓
+Structured Requirements & Material Knowledge Base (Deterministic)
+                       ↓
+Closed-Form Mechanical Engineering Solver (Deterministic Mathematics)
+                       ↓
+Explicit Engineering Policies (Configured Nominal Sizing)
+                       ↓
+Parametric CAD & 2D Technical Drawings (OpenCascade / BRep)
+                       ↓
+Dimensional Cross-Validation Matrix & Engineering Handoff Package
+```
+
+> **Core Principle**: AI handles ambiguity, language interpretation, and visual semantic extraction; deterministic engineering software handles calculations, material properties, constraints, nominal sizing, and CAD generation.
+
+The LLM is strictly an interpreter of engineering intent. It **never** performs engineering arithmetic, torque calculation, stress analysis, factor of safety estimation, or geometry synthesis.
 
 ---
 
-## Grounded Engineering Reasoning
+## 1. Overview
 
-### Why Structured Evidence Instead of Raw Image Prompting?
-Generic multimodal prompts ("look at this image and tell me what it means") suffer from high hallucination rates on technical drawings: small text numbers blur together, leader lines are misinterpreted, and models invent measurements not present on the drawing. 
+Mechanical engineering workflows often require translating high-level operational requirements into preliminary component sizing, material selection, standard nominal dimensioning, and 3D/2D CAD models.
 
-By operating strictly on the structured evidence produced by Slices 1–3, the reasoning engine:
-1. **Never hallucinates geometry or measurements:** The LLM only reasons over verified coordinates, diameters, tolerances, and OCR tokens.
-2. **Cites specific entity IDs:** Every claim points back to a concrete entity (`circle_0`, `dim_1`, `line_0`).
-3. **Preserves uncertainties:** Ambiguities and measurement discrepancies are brought forward rather than smoothed over.
+This system automates this progression as a **Transmission Shaft Design Vertical Slice (V1)**:
+- **Input**: A natural-language problem statement (e.g., *"Design a solid transmission shaft transmitting 7.5 kW at 1200 RPM using AISI 1045 steel with a factor of safety of 2.2"*), optionally augmented with structured overrides.
+- **Processing**: Extracts structured requirements with field-level provenance, resolves material properties via an authoritative Material Knowledge Base, calculates torsional shear stresses, applies an explicit metric nominal diameter selection policy, and verifies yield-strength design constraints.
+- **Output**: Generates ISO-10303-21 STEP CAD models, vector-rendered 2D SVG engineering drawings, an automated dimensional cross-validation matrix, and an auditable Engineering Handoff package.
 
-### Architecture & Reasoning Pipeline
+---
 
+## 2. What It Demonstrates
+
+- **Natural-Language Requirement Interpretation**: Extracts power, rotational speed, factor of safety, length, and material designations with exact source-text span provenance and confidence tracking.
+- **Material Knowledge Base (v1)**: Deterministic lookup supporting standard designations (`S235JR`, `S275JR`, `S355J2`, `AISI 1018`, `AISI 1045`, `AISI 4140`, `AISI 304`, `6061-T6`) with authoritative standards metadata (EN 10025-2, ASTM A29/A108/A240/B221, ISO 683).
+- **Anti-Hallucination & Override Hierarchy**: Generic material terms (e.g. `"steel"`) without explicit yield strength strictly halt as `BLOCKED`. Explicit user yield strength overrides database values with full audit trail tracking (`"Explicit override"`).
+- **Closed-Form Torsional Sizing**: Analytical torque calculation, von Mises distortion-energy shear yield conversion ($S_{sy} = 0.57735 \cdot S_y$), allowable shear stress calculation, and minimum theoretical diameter derivation.
+- **Configured Nominal Diameter Policy**: Sizing policy selecting the smallest standard diameter from an explicit metric series (`[6, 8, 10, 12, 14, ..., 200 mm]`) with out-of-bounds protection.
+- **Yield-Strength Constraint Verification**: Evaluates design torsional shear stress ($\tau_{\\text{design}}$) and achieved factor of safety against allowable limits.
+- **Parametric 3D Solid CAD Synthesis**: OpenCascade BRep solid model synthesis with analytical volume verification ($0.0000\%$ error against theoretical).
+- **2D Technical Drawing Derivation**: Orthographic projection with dimension callouts, leader lines, and standard engineering title block metadata.
+- **CAD <-> Drawing Dimensional Cross-Validation**: Automated cross-validation verifying that drawing annotations exactly match 3D solid geometry (100% agreement check).
+- **Engineering Design Review Web Console**: Interactive browser console (`/ui`) providing live SVG viewports, derivation step trees, traceability matrices, and downloadable STEP artifacts.
+- **Deterministic Test Suite**: **424 passing automated tests across 28 test suites** covering nominal sizing, failure paths, material resolution, and API contracts.
+
+---
+
+## 3. Architecture
+
+```mermaid
+flowchart TD
+    A[Natural Language Requirement / Prompt] --> B[Requirement Extractor\n- LLM / Rule-Based Parsing\n- Field-Level Span Provenance]
+    C[Structured Inputs\ne.g., length_mm, yield_strength_mpa] --> B
+
+    B --> D[Requirement Validator\n- Completeness & Bounds\n- Physically Valid Numbers]
+
+    D -- Missing Info --> E1[Status: BLOCKED\nZero Fabrication]
+    D -- Invalid Input --> E2[Status: INVALID\nExecution Halted]
+
+    D -- Valid --> F[Material Knowledge Base v1\n- Deterministic Repository\n- Precedence Hierarchy\n- Explicit Sy Override]
+
+    F --> G[Shaft Engineering Solver\n- T = P / ω\n- S_sy = 0.57735 · S_y\n- τ_allow = S_sy / FoS\n- d_req = 16T / πτ_allow ^ 1/3]
+
+    G --> H[Nominal Diameter Policy\n- Configured Series Policy\n- d_nominal >= d_req]
+
+    H --> I[Design Constraint Check\n- τ_design <= τ_allow\n- FoS_achieved >= FoS_req]
+
+    I --> J[Parametric CAD Generator\n- OpenCascade BRep Modeling\n- ISO-10303-21 STEP Export\n- Analytical Volume Check]
+
+    J --> K[2D Technical Drawing Engine\n- SVG Projection & Rendering\n- Dimension Callouts & Title Block]
+
+    K --> L[Dimensional Cross-Validation\n- CAD vs Drawing 100% Match]
+
+    L --> M[Engineering Handoff Package\n- JSON Traceability Matrix\n- Markdown Audit Report\n- 3D STEP & 2D SVG Artifacts]
+
+    M --> N[Design Review UI / API\n- GET /ui Web Console\n- POST /design/pipeline]
 ```
-Question + Drawing Context
-            ↓
-1. Deterministic Question Router
-   (hole_analysis | dimension_summary | relationship_analysis | ...)
-            ↓
-2. Context Selection (Token/Cost Efficiency)
-   (Pulls only relevant geometry, dimensions, and associations)
-            ↓
-3. Grounded Prompt Construction
-   (System prompt with strict citation and evidence boundaries)
-            ↓
-4. LLM Provider (MockLLMProvider / GeminiProvider via httpx)
-            ↓
-5. Deterministic Post-Generation Evidence Validator
-   - Checks every cited evidence ID against DrawingContext
-   - Flags/demotes hallucinated IDs to uncertainties
-   - Checks for contradictory evidence
-   - Clamps & calibrates confidence
-            ↓
-Validated ReasoningResponse
-```
 
-### Context Selection Strategy (Cost / Token Efficiency)
-Rather than dumping the entire drawing dataset into every LLM call, the prompt builder applies a targeted context filter:
-- **`hole_analysis`:** Prioritizes circle features, hole candidates, diameter/radius dimensions, and circle associations.
-- **`dimension_summary`:** Prioritizes dimensions, tolerances, units, and symbols.
-- **`relationship_analysis`:** Prioritizes line features and geometric relationships.
-- **`geometry_summary`:** Prioritizes line features, circle features, and bounding dimensions.
-- **`annotation_summary`:** Prioritizes OCR text tokens, symbols, and dimensions.
-- **`general_engineering_question`:** Compact full representation.
+---
 
-### Evidence Validation & Hallucination Prevention
-A deterministic validator inspects every JSON response from the LLM before returning it to the user:
-- Compiles the set of all valid IDs from the context (`line_0`, `circle_0`, `dim_1`, etc.).
-- Verifies that all IDs cited in `facts`, `inferences`, and `evidence` exist.
-- If the model references a nonexistent entity (e.g. `circle_99`), the claim is demoted from `facts` to `uncertainties`, tagged as `[UNVERIFIED ID]`, and a confidence penalty is applied.
-- If physical circle measurements conflict with dimension callouts (e.g. diameter 20 vs Ø25), the validator verifies that the conflict is surfaced as an uncertainty.
+## 4. Engineering Workflow
 
-### Example Reasoning Flow
+### Verified Reference Execution
 
-**Question:**
-> "What are the likely hole diameters?"
+**Input Requirement**:
+> *"Design a solid circular transmission shaft made of AISI 1045 to transmit 7.5 kW at 1200 RPM with a factor of safety of 2.2."* (Length: $L = 350.0\\text{ mm}$)
 
-**Structured Evidence Provided:**
-- `circle_0`: center=(50, 100), radius=10, diameter=20, likely_hole=true
-- `dim_1`: raw_text="Ø20", value=20.0, dimension_type="diameter"
-- `assoc_0`: links `dim_1` to `circle_0`
+**Execution Chain**:
+1. **Extraction & Provenance**:
+   - $P = 7.5\\text{ kW}$, $N = 1200.0\\text{ RPM}$, $\\text{FoS}_{\\text{req}} = 2.2$, $L = 350.0\\text{ mm}$, Material: `AISI 1045` (Confidence: 1.0)
+2. **Material Knowledge Resolution**:
+   - Resolved Record: `AISI 1045` (Normalized condition per ASTM A29 / ISO 683-1)
+   - Yield Strength: $S_y = 310.0\\text{ MPa}$ (Source: Knowledge Base, Status: `Verified`)
+3. **Deterministic Mechanical Sizing**:
+   - Angular speed: $\\omega = \\frac{2\\pi \\cdot 1200}{60} = 125.6637\\text{ rad/s}$
+   - Transmitted torque: $T = \\frac{P}{\\omega} = \\frac{7500\\text{ W}}{125.6637\\text{ rad/s}} = 59.683\\text{ N}\\cdot\\text{m}$
+   - Shear yield strength (von Mises): $S_{sy} = 0.57735 \\cdot 310.0\\text{ MPa} = 178.98\\text{ MPa}$
+   - Allowable shear stress: $\\tau_{\\text{allow}} = \\frac{S_{sy}}{\\text{FoS}_{\\text{req}}} = \\frac{178.98\\text{ MPa}}{2.20} = 81.35\\text{ MPa}$
+   - Theoretical minimum diameter:
+     $$d_{\\text{req}} = \\left( \\frac{16 \\cdot T}{\\pi \\cdot \\tau_{\\text{allow}}} \\right)^{1/3} = \\left( \\frac{16 \\cdot 59.683}{\\pi \\cdot 8.135 \\times 10^7} \\right)^{1/3} = 15.52\\text{ mm}$$
+4. **Configured Nominal Diameter Selection**:
+   - Series Policy: `metric_nominal_shaft_series_r20_custom` (`[6, 8, 10, 12, 14, 15, 16, 18, 20, ..., 200 mm]`)
+   - Selected: $d_{\\text{nominal}} = 16.0\\text{ mm}$ (Smallest standard diameter $\\ge 15.52\\text{ mm}$)
+5. **Stress Evaluation & Constraint Validation**:
+   - Design torsional shear stress: $\\tau_{\\text{design}} = \\frac{16 \\cdot 59.683}{\\pi \\cdot (0.0160)^3} = 74.21\\text{ MPa}$
+   - Achieved Factor of Safety: $\\text{FoS}_{\\text{achieved}} = \\frac{178.98\\text{ MPa}}{74.21\\text{ MPa}} = 2.41$
+   - Constraint Check: `Yield-Strength Design Constraint Satisfied (τ_design ≤ τ_allow)`
+6. **CAD, 2D Drawing & Cross-Validation**:
+   - 3D BRep Volume: $70,371.68\\text{ mm}^3$ (Theoretical: $70,371.68\\text{ mm}^3$, Error: $0.0000\\%$)
+   - STEP Export: `shaft_16x350.stp` (3,237 bytes)
+   - 2D Drawing: `shaft_16x350_drawing.svg` (6,242 bytes)
+   - Dimensional Agreement: Diameter Match (16.0 mm == 16.0 mm), Length Match (350.0 mm == 350.0 mm) -> **100% Match**.
 
-**Reasoning Response:**
+---
+
+## 5. Material Knowledge Base (V1)
+
+The Material Knowledge Base provides deterministic lookup backed by published international standards without LLM interpolation.
+
+### Curated V1 Material Dataset
+
+| Identifier | Designation | Category | $S_y$ (MPa) | $S_{ut}$ (MPa) | $E$ (GPa) | $\\nu$ | $\\rho$ ($\\text{kg/m}^3$) | Standard / Condition Reference |
+|---|---|---|---|---|---|---|---|---|
+| `mat_s235jr` | **S235JR** | Structural Steel | 235.0 | 360.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\\text{ mm}$) |
+| `mat_s275jr` | **S275JR** | Structural Steel | 275.0 | 430.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\\text{ mm}$) |
+| `mat_s355j2` | **S355J2** | Structural Steel | 355.0 | 510.0 | 210.0 | 0.30 | 7850 | EN 10025-2:2019 Table 7 ($t \\le 16\\text{ mm}$) |
+| `mat_aisi_1018` | **AISI 1018** | Carbon Steel | 370.0 | 440.0 | 205.0 | 0.29 | 7870 | ASTM A29 / ASTM A108 (Cold Drawn) |
+| `mat_aisi_1045` | **AISI 1045** | Carbon Steel | 310.0 | 565.0 | 206.0 | 0.29 | 7850 | ASTM A29 / ISO 683-1 (Normalized) |
+| `mat_aisi_4140` | **AISI 4140** | Alloy Steel | 655.0 | 930.0 | 210.0 | 0.30 | 7850 | ASTM A29 / ISO 683-2 (Q&T @ 600°C) |
+| `mat_aisi_304` | **AISI 304** | Stainless Steel | 205.0 | 515.0 | 193.0 | 0.29 | 8000 | ASTM A240 / EN 10088-2 ($R_{p0.2}$) |
+| `mat_al_6061_t6` | **6061-T6** | Aluminum Alloy | 276.0 | 310.0 | 68.9 | 0.33 | 2700 | ASTM B221 / EN 755-2 (T6 Temper) |
+
+> **Engineering Note**: Material properties in engineering practice depend on heat treatment, temper, section thickness, manufacturing process, and operating temperature. Values in V1 represent baseline nominal conditions cited from the listed standards.
+
+### Resolution Precedence Hierarchy
+
+$$\\text{Explicit Structured Input} > \\text{Explicit Prompt Requirement} > \\text{Knowledge Base Lookup} > \\text{Unresolved / BLOCKED}$$
+
+- **Explicit Override**: If a user specifies `"material": "S355"` and `"yield_strength_mpa": 280.0`, the explicit $280\\text{ MPa}$ takes precedence and the discrepancy is logged as `"Explicit override"`.
+- **Generic Term Blocking**: Generic material inputs like `"steel"` or `"aluminum"` without specific grade or explicit $S_y$ remain strictly **`BLOCKED`**. The system **never** silently substitutes S355 or any other default.
+
+---
+
+## 6. Engineering Calculation Model
+
+The V1 solver models a solid circular transmission shaft subjected to pure steady torsional loading:
+
+1. **Angular Velocity**:
+   $$\\omega = \\frac{2\\pi \\cdot N}{60} \\quad [\\text{rad/s}]$$
+2. **Transmitted Torque**:
+   $$T = \\frac{P \\cdot 1000}{\\omega} \\quad [\\text{N}\\cdot\\text{m}]$$
+3. **Shear Yield Strength (von Mises Distortion Energy Theory)**:
+   $$S_{sy} = \\frac{1}{\\sqrt{3}} \\cdot S_y \\approx 0.57735 \\cdot S_y \\quad [\\text{MPa}]$$
+4. **Allowable Torsional Shear Stress**:
+   $$\\tau_{\\text{allow}} = \\frac{S_{sy}}{\\text{FoS}_{\\text{required}}} \\quad [\\text{MPa}]$$
+5. **Theoretical Required Diameter**:
+   $$d_{\\text{req}} = \\left( \\frac{16 \\cdot T}{\\pi \\cdot \\tau_{\\text{allow}}} \\right)^{1/3} \\quad [\\text{m}]$$
+6. **Configured Nominal Diameter Selection**:
+   $$d_{\\text{nominal}} = \\min \\{ d \\in \\mathcal{S}_{\\text{nominal}} \\mid d \\ge d_{\\text{req}} \\}$$
+   Where $\\mathcal{S}_{\\text{nominal}} = [6, 8, 10, 12, 14, 15, 16, 17, 18, 20, 22, 24, 25, 28, 30, \\dots, 200]\\text{ mm}$.
+7. **Design Stress & Achieved Factor of Safety**:
+   $$\\tau_{\\text{design}} = \\frac{16 \\cdot T}{\\pi \\cdot d_{\\text{nominal}}^3}, \\quad \\text{FoS}_{\\text{achieved}} = \\frac{S_{sy}}{\\tau_{\\text{design}}}$$
+8. **Design Constraint Check**:
+   $$\\tau_{\\text{design}} \\le \\tau_{\\text{allow}} \\quad \\land \\quad \\text{FoS}_{\\text{achieved}} \\ge \\text{FoS}_{\\text{required}}$$
+
+---
+
+## 7. CAD and Drawing Output
+
+- **3D Solid Modeling**: Synthesizes exact parametric cylindrical solids via OpenCascade with deterministic geometric fallback.
+- **BRep Solid Validation**: Evaluates solid topology and analytical volume accuracy against theoretical geometry ($\\text{Error} \\le 0.001\\%$).
+- **ISO-10303-21 STEP Export**: Exports production-ready STEP CAD models.
+- **2D Technical Drawings (SVG)**: Renders orthographic projections including centerlines, linear/diameter dimension callouts, projection tags, and engineering title block metadata.
+- **Dimensional Cross-Validation**: Inspects generated drawing dimension values against actual CAD BRep dimensions, asserting exact parity before release.
+
+---
+
+## 8. Web Interface
+
+The web interface is hosted at **`/ui`** (redirected from `/` and `/design-review`).
+
+### Features:
+- **Prompt Console**: Natural-language input with one-click example chips (e.g. Standard 5 kW Shaft, Custom 280 MPa Override, Blocked Generic Steel).
+- **Interactive Review Tabs**:
+  1. **Requirements & Extraction**: Extracted specification table with explicit confidence and source text spans.
+  2. **Engineering Sizing**: Step-by-step mathematical derivations, intermediate equations, and yield-strength constraint verification.
+  3. **2D Technical Drawing**: Interactive SVG viewport with full vector zooming and direct SVG download.
+  4. **Traceability Matrix**: Multi-column matrix comparing Prompt Origin -> Analytical Solver -> 3D CAD -> 2D Drawing dimensions.
+  5. **Artifact Package**: Download cards for generated ISO-10303-21 STEP models and SVG drawings.
+  6. **Audit Report**: Formatted markdown engineering handoff report with full parameter provenance.
+
+---
+
+## 9. API Reference
+
+### Canonical Endpoint: `POST /design/pipeline`
+
+Executes the complete end-to-end requirement extraction, material resolution, sizing, CAD, drawing, and validation sequence.
+
+**Request Schema**:
 ```json
 {
-  "answer": "The drawing contains 1 likely hole(s) with nominal diameter around 20.0 mm.",
-  "facts": [
-    {
-      "statement": "Feature circle_0 has detected circle diameter of 20.0.",
-      "evidence": ["circle_0"]
-    },
-    {
-      "statement": "Dimension dim_1 specifies 20.0.",
-      "evidence": ["dim_1"]
-    }
-  ],
-  "inferences": [
-    {
-      "statement": "Dimension dim_1 corresponds to candidate hole circle_0.",
-      "evidence": ["circle_0", "dim_1"]
-    }
-  ],
-  "uncertainties": [],
-  "evidence": ["circle_0", "dim_1"],
-  "confidence": {
-    "score": 0.88,
-    "source": "validated_grounded_evidence"
+  "problem_statement": "Design a solid transmission shaft transmitting 7.5 kW at 1200 RPM using AISI 1045 steel with a factor of safety of 2.2.",
+  "engineering_inputs": {
+    "length_mm": 350.0
   },
-  "metadata": {
-    "question_type": "hole_analysis",
-    "provider": "MockLLMProvider",
-    "model": "deterministic_mock",
-    "validation_status": "passed",
-    "estimated_prompt_tokens": 142
-  }
+  "output_dir": null
 }
 ```
 
+**Response Schema**:
+```json
+{
+  "status": "SUCCESS",
+  "spec": {
+    "component": "shaft",
+    "material": "AISI 1045",
+    "power_kw": 7.5,
+    "rpm": 1200.0,
+    "factor_of_safety": 2.2,
+    "length_mm": 350.0,
+    "yield_strength_mpa": 310.0,
+    "provenance": { }
+  },
+  "material_resolution": {
+    "requested_material": "AISI 1045",
+    "resolved": true,
+    "resolved_material": "AISI 1045",
+    "standard": "ASTM A29 / ISO 683-1",
+    "yield_strength_mpa": 310.0,
+    "yield_strength_source": "Knowledge Base (ASTM A29 / ISO 683-1)",
+    "status": "Verified",
+    "is_explicit_override": false
+  },
+  "solver_result": {
+    "is_valid": true,
+    "status": "VALID",
+    "torque_nm": 59.683,
+    "allowable_stress_mpa": 81.35,
+    "minimum_required_diameter_mm": 15.52,
+    "selected_diameter_mm": 16.0,
+    "design_stress_mpa": 74.21,
+    "achieved_factor_of_safety": 2.41,
+    "is_safe": true,
+    "diameter_selection_policy": "metric_nominal_shaft_series_r20_custom",
+    "calculation_steps": [ ]
+  },
+  "cad_status": "GENERATED",
+  "cross_validation": {
+    "diameter_matches": { "drawing_value": 16.0, "cad_value": 16.0, "match": true },
+    "length_matches": { "drawing_value": 350.0, "cad_value": 350.0, "match": true },
+    "all_match": true
+  },
+  "artifacts": {
+    "step": { "filename": "shaft_16x350.stp", "file_path": "/path/to/shaft_16x350.stp" },
+    "svg": { "filename": "shaft_16x350_drawing.svg", "file_path": "/path/to/shaft_16x350_drawing.svg" }
+  },
+  "report": "# End-to-End Mechanical Design Pipeline Report..."
+}
+```
+
+### Additional Endpoints
+
+| Endpoint | Method | Role |
+|---|---|---|
+| `/ui` | `GET` | Web console for engineering design review |
+| `/artifacts/{path}` | `GET` | Static artifact downloads (STEP / SVG) |
+| `/design/cad` | `POST` | Dedicated parametric CAD and 2D drawing synthesis |
+| `/design/specification` | `POST` | Requirement interpretation & analysis planning |
+| `/design` | `POST` | Legacy candidate-search design endpoint (Slice 12) |
+| `/analyze` | `POST` | 2D drawing computer vision feature extraction |
+| `/reason` | `POST` | Evidence-grounded drawing reasoning |
+
 ---
 
-## API Usage
+## 10. Project Structure
 
-### 1. Start Server
-```bash
-uvicorn api.main:app --reload
+```text
+src/
+├── api/                        # FastAPI routers and application entrypoint
+│   ├── main.py                 # App initialization, static mounts (/ui, /artifacts)
+│   └── routes.py               # /design/pipeline, /design/cad, /analyze endpoints
+├── cad/                        # 3D CAD & 2D Technical Drawing Engine (Slice 13)
+│   ├── backend.py              # OpenCascade / deterministic BRep fallback adapter
+│   ├── brep.py                 # Solid topology, face, and volume validation
+│   ├── drawing.py              # 2D projection, dimension callouts & SVG rendering
+│   ├── exporters.py            # ISO-10303-21 STEP file exporter
+│   ├── generator.py            # CADSpecification -> CADResult synthesis
+│   └── handoff.py              # Engineering handoff container creation
+├── design_engine/              # Legacy candidate-search design engine (Slice 12)
+│   ├── designer.py             # Multi-objective shaft design synthesis
+│   └── shaft.py                # Closed-form shaft equations & diameter calculations
+├── knowledge/                  # Engineering Knowledge & Rules
+│   ├── materials/              # Material Knowledge Base (v1)
+│   │   ├── schema.py           # Pydantic MaterialRecord & validation result models
+│   │   ├── registry.py         # Schema-validated JSON loader & registry
+│   │   ├── repository.py       # Deterministic lookup, normalization & override logic
+│   │   └── data/
+│   │       └── materials.json  # Authoritative EN/ASTM/ISO material property records
+│   └── tests/
+│       └── test_materials.py   # Material schema, lookup, override & pipeline tests
+├── requirements/               # Deterministic Requirements & Pipeline Orchestration
+│   ├── diameter_policy.py      # Configured standard metric nominal diameter series
+│   ├── extractor.py            # Grounded requirement extraction & field provenance
+│   ├── models.py               # EngineeringSpec, EngineeringResult, EndToEndDesignResult
+│   ├── pipeline.py             # End-to-end design pipeline orchestrator
+│   ├── solver.py               # Deterministic closed-form shaft engineering solver
+│   ├── validator.py            # Physical & schema constraint validator
+│   └── tests/                  # Pipeline, extractor, solver & diameter policy tests
+├── solvers/                    # Deterministic Engineering Physics Solvers
+│   ├── torsion.py              # Closed-form torsion analysis
+│   ├── bending.py              # Beam bending solver
+│   └── combined_stress.py      # Principal & von Mises combined stress solver
+├── ui/                         # Design Review Web Console
+│   ├── index.html              # Clean dark-mode engineering console UI
+│   ├── style.css               # Design tokens, typography, and responsive styling
+│   └── app.js                  # Frontend logic & live drawing rendering (zero UI math)
+└── tests/                      # Full test suite (API, CAD, solvers, vision, UI)
 ```
 
-### 2. Analyze Drawing (`POST /analyze`)
-```bash
-curl -X POST "http://localhost:8000/analyze" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@drawing.png"
+---
+
+## 11. Validation & Testing
+
+The repository maintains **424 passing automated tests across 28 test suites** with zero failures:
+
+```text
+============================= test session starts ==============================
+platform linux -- Python 3.12.14, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/aad_dev95/mechai-engineering-drawing-intelligence
+plugins: anyio-4.15.1
+collected 424 items
+
+424 passed in 9.49s
 ```
 
-### 3. Reason Over Drawing Context (`POST /reason`)
+### Verified Test Areas:
+- **Material Knowledge Base**: Schema validation, boundary checks, case/whitespace normalization, explicit $S_y$ override, and generic steel blocking.
+- **Analytical Physics Solvers**: Torsion, bending, combined stress, distortion energy theory, and unit conversions.
+- **Diameter Selection Policy**: Boundary tests (e.g. $d_{\\text{req}} = 11.999999\\text{ mm} \\to d_{\\text{nominal}} = 12.0\\text{ mm}$) and maximum diameter bounds.
+- **CAD & Drawing Integration**: OpenCascade solid synthesis, theoretical volume verification ($0.0000\\%$ error), STEP export, and CAD <-> drawing dimensional cross-validation.
+- **Failure Paths**: Missing parameters (length, yield strength, power, speed) halt cleanly with `BLOCKED`/`INVALID` status without triggering CAD generation.
+- **API & UI Contracts**: Full endpoint contracts, static file serving, and error handling.
+
+---
+
+## 12. Running Locally
+
+### Prerequisites
+- Linux / WSL / macOS
+- Python 3.12+
+
+### Setup & Installation
+
+1. **Clone Repository**:
+   ```bash
+   git clone https://github.com/aadil-lang/Engineering-design-automation.git
+   cd Engineering-design-automation
+   ```
+
+2. **Create and Activate Virtual Environment**:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Run the Automated Test Suite**:
+   ```bash
+   PYTHONPATH=src pytest -v
+   ```
+
+5. **Start the API & Web Console**:
+   ```bash
+   PYTHONPATH=src uvicorn api.main:app --host 0.0.0.0 --port 8000
+   ```
+
+6. **Access Web Console**:
+   Open **`http://localhost:8000/ui`** in your browser.
+
+---
+
+## 13. Example API Request
+
 ```bash
-curl -X POST "http://localhost:8000/reason" \
+curl -X POST "http://localhost:8000/design/pipeline" \
   -H "Content-Type: application/json" \
   -d '{
-    "question": "What are the likely hole diameters?",
-    "drawing": { ... }
+    "problem_statement": "Design a solid transmission shaft transmitting 7.5 kW at 1200 RPM using AISI 1045 steel with a factor of safety of 2.2.",
+    "engineering_inputs": {
+      "length_mm": 350.0
+    }
   }'
 ```
 
-### 4. Direct Convenience Endpoint (`POST /analyze-and-reason`)
-```bash
-curl -X POST "http://localhost:8000/analyze-and-reason" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@drawing.png" \
-  -F "question=What dimensions and holes are present?"
-```
+---
+
+## 14. Design Principles
+
+- **Separation of Concerns**: AI handles natural-language intent and visual semantics; deterministic Python code handles equations, materials, and CAD generation.
+- **Zero Fabricated Mathematics**: The system never guesses or estimates engineering values. If inputs are missing, execution halts cleanly with `BLOCKED`.
+- **Explicit Material Provenance**: Material properties cite published standards and explicitly track whether a property originated from user input or database lookup.
+- **Dimensional Parity**: 2D drawing callouts must cross-validate against 3D solid geometry before release.
+- **Constraint-Based Terminology**: Uses precise engineering descriptions (`"Yield-Strength Design Constraint Satisfied"`) rather than unwarranted safety or certification claims.
 
 ---
 
-## Testing
-Run the complete test suite across Slices 1, 2, 3, and 4:
-```bash
-PYTHONPATH=src pytest -q
-```
-All tests run 100% deterministically offline using `MockLLMProvider` without requiring external API credentials.
+## 15. Scope & Limitations
+
+### Current Scope (V1)
+- **Component**: Solid circular transmission shafts under steady torsional loading.
+- **Materials**: Standard engineering grades in baseline nominal conditions (EN 10025-2, ASTM A29/A108/A240/B221, ISO 683).
+- **Nominal Sizes**: Standard metric series from $6.0\\text{ mm}$ to $200.0\\text{ mm}$.
+
+### Engineering Disclaimer
+> **Disclaimer**: This system is an automated engineering design-assistance prototype. Generated calculations, CAD models, and technical drawings are preliminary sizing outputs. They do not constitute formal manufacturing approval or certified professional engineering sign-off. All outputs must be reviewed and approved by a qualified engineer before production release.
 
 ---
 
-## Limitations
-- Full composite GD&T datum reference frame decoding is deferred to future work.
-- In low-contrast or degraded scans, severe OCR omissions may require manual review of the detected evidence before drawing conclusions.
+## 16. Roadmap
+
+- **V1 (Current)**: Transmission shaft design vertical slice with Material Knowledge Base, analytical solver, OpenCascade STEP CAD, 2D drawings, dimensional cross-validation, and review UI.
+- **V1.x**: CI/CD automation, production containerization, and multi-tenant artifact access.
+- **V2**: Additional machine element solvers (stepped shafts, keyways, bearings, couplings, bolted joints).
+- **V3**: Multi-load combined stress analysis (combined torsion, bending, axial, fatigue life).
+- **V4**: Multi-component assembly reasoning and automated Bill of Materials (BOM) validation.
+
+---
+
+## 17. Why This Project Matters
+
+Translating ambiguous natural-language intent into preliminary mechanical designs while maintaining **absolute mathematical determinism, standards-backed material provenance, and dimensional cross-validation** represents the core challenge of applied AI in engineering.
+
+This project demonstrates how AI and classical engineering software can be combined reliably without allowing stochastic models to compute physical dimensions.

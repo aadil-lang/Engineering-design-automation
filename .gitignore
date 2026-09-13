@@ -11,8 +11,9 @@ venv/
 .env.*
 !.env.example
 
-# Runtime-generated engineering artifacts
+# Runtime-generated engineering artifacts & evaluation outputs
 artifacts/
+evaluation_results/
 
 # Frontend dependencies/build output
 node_modules/
