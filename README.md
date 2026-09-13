@@ -468,3 +468,19 @@ curl -X POST "http://localhost:8000/design/pipeline" \
 Translating ambiguous natural-language intent into preliminary mechanical designs while maintaining **absolute mathematical determinism, standards-backed material provenance, and dimensional cross-validation** represents the core challenge of applied AI in engineering.
 
 This project demonstrates how AI and classical engineering software can be combined reliably without allowing stochastic models to compute physical dimensions.
+
+---
+
+## 18. Domain Background & Author Context
+
+This project is grounded in the author's academic and practical mechanical-engineering background:
+
+- **Academic Foundations**: Formal coursework and academic study in **Design of Machine Elements**, mechanics of materials, and failure theories (von Mises distortion energy, maximum shear stress, factor of safety formulation).
+- **CAD & Mechanical Design Experience**: Prior hands-on experience in 3D parametric solid modeling, dimensional tolerancing, and orthographic drafting workflows using **PTC Creo Parametric**.
+
+This domain context directly informed key architectural decisions across the system:
+1. **Strict Separation of AI from Mechanics**: Enforcing that language models interpret human intent while deterministic closed-form physics engines handle all stress, torque, and diameter calculations.
+2. **Standard Nominal Sizing Policies**: Recognizing that theoretical calculated dimensions (e.g., $15.52\text{ mm}$) must map to configured standard stock series ($16.0\text{ mm}$) for practical manufacturability.
+3. **Automated Drawing & CAD Cross-Validation**: Mirroring traditional mechanical engineering drawing review workflows where 2D manufacturing callouts must rigorously reconcile with 3D solid geometry before handoff.
+
+*(Note: This background is presented as foundational domain context that guided the engineering design automation architecture, not as a claim of licensed professional engineering certification or current commercial design employment.)*
