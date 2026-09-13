@@ -59,31 +59,53 @@ This system automates this progression as a **Transmission Shaft Design Vertical
 
 ```mermaid
 flowchart TD
-    A[Natural Language Requirement / Prompt] --> B[Requirement Extractor\n- LLM / Rule-Based Parsing\n- Field-Level Span Provenance]
-    C[Structured Inputs\ne.g., length_mm, yield_strength_mpa] --> B
+    subgraph Inputs["1. Engineering Inputs"]
+        A["Natural Language Requirement / Prompt"]
+        B["Structured Overrides (Length, Sy, FoS)"]
+    end
 
-    B --> D[Requirement Validator\n- Completeness & Bounds\n- Physically Valid Numbers]
+    subgraph Ingestion["2. Intent Extraction & Validation"]
+        C["Requirement Extractor<br/>(LLM / Rule-Based Parsing with Provenance)"]
+        D{"Requirement Validator<br/>(Completeness & Range Checks)"}
+        E1["Status: BLOCKED<br/>(Missing Core Parameters)"]
+        E2["Status: INVALID<br/>(Unphysical / Out-of-Bounds)"]
+    end
 
-    D -- Missing Info --> E1[Status: BLOCKED\nZero Fabrication]
-    D -- Invalid Input --> E2[Status: INVALID\nExecution Halted]
+    subgraph Knowledge["3. Material Resolution"]
+        F["Material Knowledge Base v1<br/>(Deterministic Lookup & Precedence)"]
+    end
 
-    D -- Valid --> F[Material Knowledge Base v1\n- Deterministic Repository\n- Precedence Hierarchy\n- Explicit Sy Override]
+    subgraph Engineering["4. Deterministic Sizing & Verification"]
+        G["Shaft Torsion Solver<br/>(Torque, Shear Yield & Theoretical Sizing)"]
+        H["Nominal Diameter Policy<br/>(Configured Standard Series Sizing)"]
+        I{"Design Constraint Verification<br/>(Allowable Shear Stress & FoS Validation)"}
+    end
 
-    F --> G[Shaft Engineering Solver\n- T = P / ω\n- S_sy = 0.57735 · S_y\n- τ_allow = S_sy / FoS\n- d_req = 16T / πτ_allow ^ 1/3]
+    subgraph Artifacts["5. CAD & Drawing Generation"]
+        J["Parametric CAD Generator<br/>(OpenCascade 3D BRep & STEP Export)"]
+        K["2D Technical Drawing Engine<br/>(Dimensioned SVG Technical Sheet)"]
+        L["Dimensional Cross-Validator<br/>(CAD vs Drawing 100% Match)"]
+    end
 
-    G --> H[Nominal Diameter Policy\n- Configured Series Policy\n- d_nominal >= d_req]
+    subgraph Delivery["6. Handoff & Interface"]
+        M["Engineering Handoff Package<br/>(Traceability Matrix & Audit Report)"]
+        N["User Interface & API<br/>(Web Dashboard & REST Endpoints)"]
+    end
 
-    H --> I[Design Constraint Check\n- τ_design <= τ_allow\n- FoS_achieved >= FoS_req]
-
-    I --> J[Parametric CAD Generator\n- OpenCascade BRep Modeling\n- ISO-10303-21 STEP Export\n- Analytical Volume Check]
-
-    J --> K[2D Technical Drawing Engine\n- SVG Projection & Rendering\n- Dimension Callouts & Title Block]
-
-    K --> L[Dimensional Cross-Validation\n- CAD vs Drawing 100% Match]
-
-    L --> M[Engineering Handoff Package\n- JSON Traceability Matrix\n- Markdown Audit Report\n- 3D STEP & 2D SVG Artifacts]
-
-    M --> N[Design Review UI / API\n- GET /ui Web Console\n- POST /design/pipeline]
+    A --> C
+    B --> C
+    C --> D
+    D -->|"Missing Info"| E1
+    D -->|"Invalid Input"| E2
+    D -->|"Valid Requirements"| F
+    F --> G
+    G --> H
+    H --> I
+    I -->|"Constraints Passed"| J
+    J --> K
+    K --> L
+    L --> M
+    M --> N
 ```
 
 ---
