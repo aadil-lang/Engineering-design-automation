@@ -279,3 +279,48 @@ async def create_parametric_design(request: DesignRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Mechanical design synthesis error: {str(e)}")
 
+
+from cad.models import CADGenerationRequest, CADGenerationResponse, CADSpecification
+from cad.generator import CADGenerator
+from design_engine.models import DesignResult
+
+
+@router.post("/design/cad", response_model=CADGenerationResponse)
+async def generate_parametric_cad(request: CADGenerationRequest):
+    """
+    Parametric CAD and 2D Engineering Drawing generation endpoint (Slice 13).
+    Synthesizes 3D solid models, exports ISO-10303-21 STEP files, derives 2D orthographic
+    drawing projections, and renders engineering SVGs with dimensional cross-validation.
+    """
+    try:
+        generator = CADGenerator()
+
+        if request.design_result:
+            dr = request.design_result
+            if isinstance(dr, dict):
+                dr = DesignResult(**dr)
+            res = generator.generate_from_design_result(
+                design_result=dr,
+                extra_inputs=request.engineering_inputs
+            )
+        elif request.problem_statement:
+            res = generator.generate_from_problem_statement(
+                problem_statement=request.problem_statement,
+                extra_inputs=request.engineering_inputs
+            )
+        elif request.cad_parameters:
+            spec = CADSpecification(**request.cad_parameters)
+            res = generator.generate(spec)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Must provide design_result, problem_statement, or cad_parameters."
+            )
+
+        return res
+    except ValueError as ve:
+        raise HTTPException(status_code=422, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"CAD/Drawing generation error: {str(e)}")
+
+
