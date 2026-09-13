@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MechaAI Engineering Design Review</title>
+  <link rel="stylesheet" href="/ui/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation / Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">⚙️</div>
+        <div>
+          <h1 class="brand-title">MechaAI <span class="brand-sub">Design Review Console</span></h1>
+          <p class="brand-tagline">Deterministic Mechanical Sizing • Parametric CAD • 2D Technical Drawing Intelligence</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <span class="env-tag">Slice 15 Portfolio Review</span>
+        <div id="topStatusPill" class="status-pill status-ready">SYSTEM READY</div>
+      </div>
+    </header>
+
+    <!-- Engineering Disclaimer Banner -->
+    <div class="disclaimer-banner">
+      <span class="disclaimer-icon">⚠️</span>
+      <span class="disclaimer-text">
+        <strong>Preliminary Engineering Design Output:</strong> All calculations, CAD solid models, and drawings require independent verification and formal review by a qualified engineering professional prior to fabrication or manufacturing release.
+      </span>
+    </div>
+
+    <!-- Main Workspace Grid -->
+    <main class="workspace-grid">
+      <!-- Left Column: Input Console & Scenarios -->
+      <section class="panel input-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">1. Requirement Specification</h2>
+          <span class="panel-badge">Input Console</span>
+        </div>
+
+        <div class="scenario-loader">
+          <label class="field-label">Preset Verification Scenarios:</label>
+          <div class="scenario-buttons">
+            <button type="button" class="btn btn-scenario" onclick="loadScenario('benchmark')">🎯 Benchmark (5kW S355)</button>
+            <button type="button" class="btn btn-scenario" onclick="loadScenario('missing_sy')">🚫 Missing Sy (Blocked)</button>
+            <button type="button" class="btn btn-scenario" onclick="loadScenario('missing_length')">🚫 Missing Length (Blocked)</button>
+            <button type="button" class="btn btn-scenario" onclick="loadScenario('invalid_sy')">⚠️ Invalid Sy (Invalid)</button>
+            <button type="button" class="btn btn-scenario" onclick="loadScenario('heavy_power')">⚠️ Exceeds Series (Blocked)</button>
+          </div>
+        </div>
+
+        <form id="designForm" onsubmit="handleRunDesign(event)">
+          <!-- Natural Language Requirement -->
+          <div class="form-group">
+            <label for="problemStatement" class="field-label">
+              Natural-Language Engineering Requirement:
+            </label>
+            <textarea id="problemStatement" rows="3" class="form-textarea" placeholder="Describe the mechanical transmission requirement, e.g., 'Design a solid circular steel shaft to transmit 5 kW at 1500 RPM with a minimum factor of safety of 2.'">Design a solid circular steel shaft to transmit 5 kW at 1500 RPM with a minimum factor of safety of 2.</textarea>
+            <p class="field-hint">Natural language is used strictly for requirement parameter extraction. The LLM never performs engineering math.</p>
+          </div>
+
+          <!-- Structured Explicit Engineering Inputs -->
+          <div class="structured-inputs-card">
+            <div class="card-header">
+              <span class="lock-icon">🔒</span>
+              <div>
+                <h3 class="card-title">Explicit Structured Inputs</h3>
+                <p class="card-subtitle">Mandatory physical properties — never inferred from generic text</p>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="yieldStrength" class="field-label">Yield Strength, <em>S<sub>y</sub></em> (MPa):</label>
+                <div class="input-with-unit">
+                  <input type="number" id="yieldStrength" class="form-input" step="any" placeholder="e.g. 355.0" value="355.0">
+                  <span class="unit-tag">MPa</span>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="shaftLength" class="field-label">Shaft Length, <em>L</em> (mm):</label>
+                <div class="input-with-unit">
+                  <input type="number" id="shaftLength" class="form-input" step="any" placeholder="e.g. 300.0" value="300.0">
+                  <span class="unit-tag">mm</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Button -->
+          <div class="form-actions">
+            <button type="submit" id="runDesignBtn" class="btn btn-primary">
+              <span id="btnIcon">⚡</span>
+              <span id="btnText">Run Design Pipeline</span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="resetForm()">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Right Column: Verification & Pipeline Summary -->
+      <section class="panel summary-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">2. Verification Summary</h2>
+          <span id="overallStatusBadge" class="status-badge status-neutral">NO RUN</span>
+        </div>
+
+        <div id="summaryCard" class="summary-card">
+          <div class="summary-grid">
+            <div class="summary-metric">
+              <span class="metric-label">Pipeline Status</span>
+              <span id="summaryStatusVal" class="metric-val text-muted">—</span>
+            </div>
+            <div class="summary-metric">
+              <span class="metric-label">Selected Nominal Size</span>
+              <span id="summarySizeVal" class="metric-val font-mono">—</span>
+            </div>
+            <div class="summary-metric">
+              <span class="metric-label">Achieved FoS</span>
+              <span id="summaryFosVal" class="metric-val font-mono">—</span>
+            </div>
+            <div class="summary-metric">
+              <span class="metric-label">Structural Safety</span>
+              <span id="summarySafetyVal" class="metric-val text-muted">—</span>
+            </div>
+          </div>
+
+          <!-- Verification Checklist -->
+          <div class="verification-checklist">
+            <h4 class="checklist-title">Deterministic Verification Gates:</h4>
+            <ul id="verificationGates" class="gates-list">
+              <li id="gateExtraction" class="gate-item gate-neutral"><span class="gate-icon">○</span> Requirement Extraction & Provenance</li>
+              <li id="gateValidation" class="gate-item gate-neutral"><span class="gate-icon">○</span> Explicit Parameter Validation</li>
+              <li id="gateSolver" class="gate-item gate-neutral"><span class="gate-icon">○</span> Closed-Form Mechanical Solver</li>
+              <li id="gateNominalPolicy" class="gate-item gate-neutral"><span class="gate-icon">○</span> Configured Nominal Series Policy</li>
+              <li id="gateBrep" class="gate-item gate-neutral"><span class="gate-icon">○</span> Parametric 3D BRep Topology & Volume</li>
+              <li id="gateDrawing" class="gate-item gate-neutral"><span class="gate-icon">○</span> 2D Technical Drawing Derivation</li>
+              <li id="gateCrossVal" class="gate-item gate-neutral"><span class="gate-icon">○</span> CAD ↔ Drawing Dimensional Agreement</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Execution Results Deck (Tabs & Details) -->
+    <section id="resultsDeck" class="results-deck">
+      <div class="tabs-nav">
+        <button class="tab-btn active" onclick="switchTab('tabRequirements')">📋 Extracted Requirements</button>
+        <button class="tab-btn" onclick="switchTab('tabEngineering')">🔬 Engineering Certificate</button>
+        <button class="tab-btn" onclick="switchTab('tabDrawing')">📐 2D Technical Drawing</button>
+        <button class="tab-btn" onclick="switchTab('tabTraceability')">🔗 Traceability Matrix</button>
+        <button class="tab-btn" onclick="switchTab('tabArtifacts')">📦 Artifact Package</button>
+        <button class="tab-btn" onclick="switchTab('tabReport')">📑 Audit Report</button>
+      </div>
+
+      <!-- Tab 1: Extracted Requirements & Provenance -->
+      <div id="tabRequirements" class="tab-pane active">
+        <div class="pane-card">
+          <h3 class="pane-title">Extracted Engineering Specification & Parameter Provenance</h3>
+          <p class="pane-desc">Verifies parameter origin, exact prompt text spans, explicit vs unstated fields, and confidence scores.</p>
+          <div class="table-responsive">
+            <table class="data-table" id="requirementsTable">
+              <thead>
+                <tr>
+                  <th>Field Parameter</th>
+                  <th>Value</th>
+                  <th>Units</th>
+                  <th>Provenance State</th>
+                  <th>Source Text / Origin</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="requirementsTableBody">
+                <tr><td colspan="6" class="text-center text-muted">No pipeline run yet. Click "Run Design Pipeline" above.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Engineering Results & Calculations -->
+      <div id="tabEngineering" class="tab-pane">
+        <div class="pane-card">
+          <h3 class="pane-title">Deterministic Mechanical Sizing Certificate</h3>
+          <p class="pane-desc">Values derived strictly through closed-form distortion energy mechanics. Zero LLM arithmetic.</p>
+          
+          <div class="engineering-sections-grid">
+            <!-- User Inputs -->
+            <div class="calc-box calc-box-input">
+              <div class="calc-box-header">🔒 USER INPUTS</div>
+              <div class="calc-box-body" id="engInputsList">
+                <div class="calc-row"><span class="k">Tensile Yield Strength (S_y):</span> <span class="v font-mono" id="engValSy">—</span></div>
+                <div class="calc-row"><span class="k">Shaft Length (L):</span> <span class="v font-mono" id="engValL">—</span></div>
+                <div class="calc-row"><span class="k">Transmitted Power (P):</span> <span class="v font-mono" id="engValP">—</span></div>
+                <div class="calc-row"><span class="k">Rotational Speed (N):</span> <span class="v font-mono" id="engValN">—</span></div>
+                <div class="calc-row"><span class="k">Required FoS:</span> <span class="v font-mono" id="engValFosReq">—</span></div>
+              </div>
+            </div>
+
+            <!-- Calculated Results -->
+            <div class="calc-box calc-box-calc">
+              <div class="calc-box-header">📐 CALCULATED ENGINEERING RESULTS</div>
+              <div class="calc-box-body" id="engCalcList">
+                <div class="calc-row"><span class="k">Transmitted Torque (T):</span> <span class="v font-mono" id="engValTorque">—</span></div>
+                <div class="calc-row"><span class="k">Allowable Shear Stress (τ_allow):</span> <span class="v font-mono" id="engValTauAllow">—</span></div>
+                <div class="calc-row"><span class="k">Min Required Diameter (d_req):</span> <span class="v font-mono text-highlight" id="engValDreq">—</span></div>
+              </div>
+            </div>
+
+            <!-- Design Policy -->
+            <div class="calc-box calc-box-policy">
+              <div class="calc-box-header">⚙️ DESIGN POLICY (Slice 14.5)</div>
+              <div class="calc-box-body" id="engPolicyList">
+                <div class="calc-row"><span class="k">Selected Nominal Diameter (d_nominal):</span> <span class="v font-mono text-success-strong" id="engValDsel">—</span></div>
+                <div class="calc-row"><span class="k">Nominal Series Policy:</span> <span class="v font-mono" id="engValPolicyName">—</span></div>
+                <div class="calc-row"><span class="k">Selection Rationale:</span> <span class="v text-sm" id="engValPolicyReason">—</span></div>
+              </div>
+            </div>
+
+            <!-- Verification -->
+            <div class="calc-box calc-box-verify">
+              <div class="calc-box-header">🛡️ STRUCTURAL VERIFICATION</div>
+              <div class="calc-box-body" id="engVerifyList">
+                <div class="calc-row"><span class="k">Design Shear Stress (τ_design):</span> <span class="v font-mono" id="engValTauDesign">—</span></div>
+                <div class="calc-row"><span class="k">Achieved Factor of Safety (FoS):</span> <span class="v font-mono font-bold" id="engValFosAchieved">—</span></div>
+                <div class="calc-row"><span class="k">Safety Margin Status:</span> <span class="v" id="engValSafetyStatus">—</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Derivation Steps -->
+          <div class="derivation-steps-card">
+            <h4 class="card-title">Detailed Mathematical Derivation Steps</h4>
+            <ol id="derivationStepsList" class="steps-list">
+              <li class="text-muted">No calculations available.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: 2D Technical Drawing -->
+      <div id="tabDrawing" class="tab-pane">
+        <div class="pane-card">
+          <div class="drawing-header-row">
+            <div>
+              <h3 class="pane-title">2D Technical Drawing Projection</h3>
+              <p class="pane-desc">Derived from 3D BRep solid geometry with dimensional callouts and standard title block.</p>
+            </div>
+            <div class="drawing-actions">
+              <a id="downloadSvgBtn" class="btn btn-sm btn-outline disabled" download>⬇️ Download SVG</a>
+            </div>
+          </div>
+
+          <div class="svg-viewport" id="svgViewport">
+            <div class="empty-viewport-msg text-muted">
+              <span>📐 No drawing generated yet.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 4: Traceability Matrix -->
+      <div id="tabTraceability" class="tab-pane">
+        <div class="pane-card">
+          <h3 class="pane-title">Bidirectional Parameter Traceability Matrix</h3>
+          <p class="pane-desc">End-to-end audit lineage tracking parameters from requirement prompt to 2D drawing dimensions.</p>
+          <div class="table-responsive">
+            <table class="data-table" id="traceabilityTable">
+              <thead>
+                <tr>
+                  <th>Parameter</th>
+                  <th>Requirement Origin</th>
+                  <th>Solver Output</th>
+                  <th>3D CAD Value</th>
+                  <th>2D Drawing Dimension</th>
+                  <th>Agreement Status</th>
+                </tr>
+              </thead>
+              <tbody id="traceabilityTableBody">
+                <tr><td colspan="6" class="text-center text-muted">No traceability data available.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 5: Artifact Package -->
+      <div id="tabArtifacts" class="tab-pane">
+        <div class="pane-card">
+          <h3 class="pane-title">Engineering Artifact Release Package</h3>
+          <p class="pane-desc">Generated geometry files, 2D technical drawings, and validation containers.</p>
+          <div id="artifactsGrid" class="artifacts-grid">
+            <div class="artifact-card text-muted">No artifacts generated.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 6: Audit Report -->
+      <div id="tabReport" class="tab-pane">
+        <div class="pane-card">
+          <div class="drawing-header-row">
+            <div>
+              <h3 class="pane-title">Auditable Mechanical Design Report</h3>
+              <p class="pane-desc">Complete execution record generated by the orchestration pipeline.</p>
+            </div>
+            <div>
+              <button class="btn btn-sm btn-outline" onclick="copyReportToClipboard()">📋 Copy Markdown</button>
+            </div>
+          </div>
+          <pre id="reportViewer" class="report-code-viewer">No report generated.</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div>MechaAI Engineering Intelligence Platform • Slice 15 Engineering Design Review Interface</div>
+      <div class="footer-disclaimer">Preliminary engineering analysis only. Not certified for direct manufacturing release.</div>
+    </footer>
+  </div>
+
+  <script src="/ui/app.js"></script>
+</body>
+</html>

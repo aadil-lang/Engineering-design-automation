@@ -1,7 +1,7 @@
 """
-Engineering Knowledge & Rules module (Slice 7).
+Engineering Knowledge & Rules module (Slice 7 & Material Knowledge Base v1).
 Provides deterministic engineering knowledge, rule applicability evaluation,
-and explicit missing-information tracking.
+explicit missing-information tracking, and authoritative material property resolution.
 """
 
 from knowledge.models import (
@@ -11,6 +11,13 @@ from knowledge.models import (
     EngineeringRuleMatch,
     MissingInformationItem,
     EngineeringKnowledgeResult
+)
+from knowledge.materials.schema import MaterialRecord, MaterialResolutionResult
+from knowledge.materials.registry import MaterialRegistry, get_material_registry
+from knowledge.materials.repository import (
+    MaterialRepository,
+    normalize_designation,
+    get_default_material_repository
 )
 
 __all__ = [
@@ -24,6 +31,13 @@ __all__ = [
     "EngineeringApplicabilityEngine",
     "BuiltInKnowledgeRetriever",
     "evaluate_engineering_knowledge",
+    "MaterialRecord",
+    "MaterialResolutionResult",
+    "MaterialRegistry",
+    "get_material_registry",
+    "MaterialRepository",
+    "normalize_designation",
+    "get_default_material_repository",
 ]
 
 

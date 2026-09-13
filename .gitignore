@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# Runtime-generated engineering artifacts
+artifacts/
+
+# Frontend dependencies/build output
+node_modules/
+dist/
+
+# IDE/OS
+.idea/
+.DS_Store

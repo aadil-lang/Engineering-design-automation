@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 import json
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
@@ -234,9 +235,10 @@ from design_engine.designer import design_from_specification, design_from_proble
 @router.post("/design", response_model=DesignResponse)
 async def create_parametric_design(request: DesignRequest):
     """
-    Parametric Mechanical Design Engine endpoint (Slice 12).
-    Generates, evaluates, and ranks deterministic candidate designs based on an
-    EngineeringSpecification or natural-language problem statement.
+    Parametric Mechanical Design Engine endpoint (Legacy Slice 12 Compatibility Path).
+    Generates, evaluates, and ranks candidate designs based on candidate search.
+    For the verified deterministic end-to-end design pipeline with strict yield strength
+    and nominal diameter policy, use POST /design/pipeline.
     """
     try:
         obj = None
@@ -324,3 +326,35 @@ async def generate_parametric_cad(request: CADGenerationRequest):
         raise HTTPException(status_code=500, detail=f"CAD/Drawing generation error: {str(e)}")
 
 
+
+
+class DesignPipelineRequest(BaseModel):
+    problem_statement: str
+    engineering_inputs: Optional[Dict[str, Any]] = None
+    output_dir: Optional[str] = None
+
+
+from requirements.models import EndToEndDesignResult
+from requirements.pipeline import run_design_pipeline
+
+
+@router.post("/design/pipeline", response_model=EndToEndDesignResult)
+async def run_end_to_end_design_pipeline(request: DesignPipelineRequest):
+    """
+    End-to-End Deterministic Engineering Design Pipeline (Slice 14.4).
+    Interprets natural-language requirements, validates engineering constraints,
+    executes closed-form mechanical shaft sizing, synthesizes parametric 3D BRep CAD models,
+    exports ISO-10303-21 STEP files, renders 2D technical drawings, verifies dimensional cross-validation,
+    and packages an Engineering Handoff container.
+    """
+    try:
+        res = run_design_pipeline(
+            problem_statement=request.problem_statement,
+            extra_inputs=request.engineering_inputs,
+            output_dir=request.output_dir
+        )
+        return res
+    except ValueError as ve:
+        raise HTTPException(status_code=422, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Design pipeline error: {str(e)}")
